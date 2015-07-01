@@ -1,5 +1,10 @@
 <?php
-
+/*
+    define('ERROR_VIEW_GET', '')      // url view logs http://exaple.com/?showMeLogs=1
+    define('ERROR_VIEW_PATH', '')  // absolute path for view dir
+    define('ERROR_BACKUP_DIR', '') // Backup relative dir / Only inside ERROR_VIEW_PATH
+    define('ERROR_LOG_DIR', '')    // Error log relative dir / Only inside ERROR_VIEW_PATH
+ */
 if (
     !defined('ERROR_VIEW_GET')      // url view logs http://exaple.com/?showMeLogs=1
     || !defined('ERROR_VIEW_PATH')  // absolute path for view dir
@@ -365,7 +370,7 @@ class PHPErrorCatcher
                     $size = number_format($size, 0, '', ' ').' б.';
                 }
                 $dirList[$entry] = array('<a href="'.$fileUrl.'" style="'.(is_dir($filePath) ? 'font-weight:bold;' : '').'">' . $path . $entry . '</a> ', $size, $create,
-'<a href="'.$fileUrl.'&backup=do">Бекап</a> <a href="'.$fileUrl.'&backup=del">Удалить</a>');
+                    '<a href="'.$fileUrl.'&backup=do">Бекап</a> <a href="'.$fileUrl.'&backup=del">Удалить</a>');
             }
         }
         krsort($dirList);
@@ -410,6 +415,10 @@ class PHPErrorCatcher
         if (file_exists($file)) {
             chmod($file, 0777);
             if (is_dir($file)) {
+                if (isset($_GET['backup'])) {
+                    self::doBackUpDir($file);
+                    exit();
+                }
                 echo '<h3>Logs ' . self::getPath($url) . '</h3>';
                 echo self::renderDirList(self::showDirList($url));
             } else {
@@ -442,13 +451,19 @@ class PHPErrorCatcher
      * @param $file
      */
     static function doBackUp($file) {
+
+        if (is_dir($file)) {
+            echo 'Is Dir';
+        }
+
         $backUpFile = str_replace(ERROR_VIEW_PATH, ERROR_VIEW_PATH.ERROR_BACKUP_DIR, $file);
         $backUpFileDir = dirname($backUpFile);
         if (!file_exists($backUpFileDir)) {
             mkdir($backUpFileDir, 0777, true);
         }
-        $i = pathinfo($backUpFile);
+
         if (file_exists($backUpFile)) {
+            $i = pathinfo($backUpFile);
             $backUpFile = $i['dirname'].'/'.$i['filename'].'.'.time().'.'.$i['extension'];
         }
         if (file_exists($backUpFile)) {
@@ -475,6 +490,19 @@ class PHPErrorCatcher
         }
     }
 
+    static function doBackUpDir($dir) {
+        if (!is_dir($dir)) {
+            echo 'Is not Dir';
+        }
+        $backUpFileDir = str_replace(ERROR_VIEW_PATH, ERROR_VIEW_PATH.ERROR_BACKUP_DIR, $dir);
+        if (file_exists($backUpFileDir)) {
+            $backUpFileDir = rtrim($backUpFileDir, '/').'_'.time();
+        }
+//        var_dump($dir, $backUpFileDir); exit();
+        rename($dir, $backUpFileDir);
+        header('Location: '.$_SERVER['HTTP_REFERER']);
+    }
+
     /**
      * Хлебные крошки
      * @param $url
@@ -499,6 +527,19 @@ class PHPErrorCatcher
      */
     public function getAllLogs() {
         return $this->allLogs;
+    }
+
+    /**
+     * Рекурсивно удаляем директорию
+     * @param $dir
+     * @return bool
+     */
+    public static function delTree($dir) {
+        $files = array_diff(scandir($dir), array('.','..'));
+        foreach ($files as $file) {
+            (is_dir("$dir/$file")) ? delTree("$dir/$file") : unlink("$dir/$file");
+        }
+        return rmdir($dir);
     }
 }
 
