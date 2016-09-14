@@ -16,5 +16,8 @@
   },
   "require-dev": {
     "phpmailer/phpmailer": "master"
+  },
+  "autoload": {
+    "classmap": ["lib/"]
   }
 }
