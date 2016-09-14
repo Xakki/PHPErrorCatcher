@@ -1,0 +1,20 @@
+{
+  "name": "xakki/phperrorcatcher",
+  "description": "Logger all error in file for PHP",
+  "type": "library",
+  "minimum-stability": "stable",
+  "license": "LGPL-2.1",
+  "authors": [
+    {
+      "name": "Xakki",
+      "email": "xakki@ya.ru"
+    }
+  ],
+  "require": {
+    "php": ">=5.0.0",
+    "facebook/xhprof": "dev-master"
+  },
+  "require-dev": {
+    "phpmailer/phpmailer": "master"
+  }
+}
