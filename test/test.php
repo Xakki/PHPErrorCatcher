@@ -9,7 +9,7 @@ defined('ERROR_BACKUP_DIR') || define('ERROR_BACKUP_DIR', '/_backUp'); // Backup
 if (isset($_COOKIE['debug']) || isset($_GET['debug'])) {
     defined('ERROR_DEBUG_MODE') || define('ERROR_DEBUG_MODE', true); // будет отображатся плашка
 }
-include_once __DIR__.'/../src/PHPErrorCatcher.php';
+include_once __DIR__.'/../lib/PHPErrorCatcher.php';
 
 // Можем подключить профайлер xhprof (Да , реализована только поддержка xhprof)
 // Для рисования графиков нужна либа graphviz (sudo apt-get install graphviz)

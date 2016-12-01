@@ -48,7 +48,7 @@ class PHPErrorCatcher
      * @var bool
      */
     public static $enableSessionLog = true;
-    
+
     /**
      * Параметры(POST,SESSION,COOKIE) затираемы при записи в логи
      * @var array
@@ -56,7 +56,7 @@ class PHPErrorCatcher
     public static $safeParamsKey = array(
         'password', 'input_password', 'pass'
     );
-    
+
     /*******************************/
 
     /**
@@ -114,7 +114,7 @@ class PHPErrorCatcher
     private static $functionTimeOut = null;
 
     private $postData=null, $cookieData=null, $sessionData=null;
-    
+
     /**
      * Counter
      * @var int
@@ -405,9 +405,9 @@ class PHPErrorCatcher
 
     private function setSafeParams() {
         if ($this->postData !== null) return;
-        $this->postData = $_POST;
+        $this->postData = ($_POST ? $_POST : $_SERVER['argv']);
         $this->cookieData = $_COOKIE;
-        $this->sessionData = $_SESSION;
+        $this->sessionData = (static::$enableSessionLog ? $_SESSION : null);
         foreach(static::$safeParamsKey as $key) {
             if (isset($this->postData[$key])) {
                 $this->postData[$key] = '***';
@@ -563,7 +563,7 @@ class PHPErrorCatcher
         if ($this->profilerUrl) {
             $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->profilerUrl . '">' . $this->profilerId . '</a></div>';
         }
-        
+
         return '<div class="bugs">' .
         '<span class="bugs_host">' . $_SERVER['HTTP_HOST'] . '</span> ' .
         '<span class="bugs_uri">' . $_SERVER['REQUEST_URI'] . '</span> ' .
@@ -574,7 +574,7 @@ class PHPErrorCatcher
         $this->allLogs .
         '</div>';
     }
-    
+
     /**
      * Рендер одной ошибки
      * рендерим сразу, вконце сохраним
@@ -660,7 +660,7 @@ class PHPErrorCatcher
         $s .= '</div>';
         return $s;
     }
-    
+
 
     /******************************************************************************************/
     /******************************************************************************************/
