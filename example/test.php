@@ -1,4 +1,6 @@
 <?
+    use xakki\PHPErrorCatcher\PHPErrorCatcher;
+
     /**
      * Подключение для Yii
      */
@@ -11,14 +13,17 @@
     }
     $PHPErrorCatcherLib = __DIR__ . '/../src/PHPErrorCatcher.php';
     if (!file_exists($PHPErrorCatcherLib)) return;
-    include_once $PHPErrorCatcherLib;
+
+    require_once $PHPErrorCatcherLib;
+
+    require_once __DIR__.'/../vendor/autoload.php';
 
     // Можем подключить профайлер xhprof (Да , реализована только поддержка xhprof)
     // Для рисования графиков нужна либа graphviz (sudo apt-get install graphviz)
     // естественно чтоб была подключен модуль пхпшный (sudo apt-get install php5-xhprof)
     // если хотите подключить свой "БлэкДжек с девицами" , то вам нужно переопределить метод initProfiler() и endProfiler()
     // путь к расположению библиотек профаилера
-    PHPErrorCatcher::$xhprofDir = __DIR__ . '/../vendor/facebook/xhprof';
+    PHPErrorCatcher::$xhprofDir = __DIR__ . '/../vendor/lox/xhprof';
     // профилируем только медленные скрипты, работающие больше 6сек
     PHPErrorCatcher::$minTimeProfiled = 6000;
     // Можно профилировать все запросы с переданными параметрами, к примеру
@@ -44,8 +49,7 @@
     PHPErrorCatcher::$mailer = function () {
         global $config;
         $transport = $config['components']['mailer']['transport'];
-        require_once __DIR__ . '/../vendor/phpmailer/phpmailer/PHPMailerAutoload.php';
-        $cmsmailer = new PHPMailer();
+        $cmsmailer = new \PHPMailer\PHPMailer\PHPMailer();
         $cmsmailer->Host = $transport['host'];
         $cmsmailer->Port = $transport['port'];
         $cmsmailer->SMTPAuth = true;

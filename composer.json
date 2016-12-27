@@ -14,10 +14,12 @@
     "php": ">=5.0.0"
   },
   "require-dev": {
-    "facebook/xhprof": "dev-master",
-    "phpmailer/phpmailer": "dev-master"
+    "lox/xhprof": "dev-master",
+    "phpmailer/phpmailer": "v6.0.0rc3"
   },
   "autoload": {
-    "classmap": ["src/"]
+    "psr-4": {
+      "xakki\\phperrorcatcher\\": "src/"
+    }
   }
 }

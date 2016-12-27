@@ -1,9 +1,7 @@
 <?php
-    /*
-        define('ERROR_VIEW_GET', '')      // url view logs http://exaple.com/?showMeLogs=1
-        define('ERROR_VIEW_PATH', '')  // absolute path for view dir
-        define('ERROR_BACKUP_DIR', '') // Backup relative dir / Only inside ERROR_VIEW_PATH
-     */
+
+    namespace xakki\phperrorcatcher;
+
     if (
         !defined('ERROR_VIEW_GET')      // url view logs http://exaple.com/?showMeLogs=1
         || !defined('ERROR_VIEW_PATH')  // absolute path for view dir
@@ -12,7 +10,8 @@
     ) {
         exit('Not defined constants for PHPErrorCatcher!!!');
     }
-// Прописываем параметры для консольного запуска скрипта
+
+    // Дописываем параметры для консольного запуска скрипта
     if (!isset($_SERVER['HTTP_HOST'])) $_SERVER['HTTP_HOST'] = 'console';
     if (!isset($_SERVER['REQUEST_URI'])) $_SERVER['REQUEST_URI'] = '*';
     if (!isset($_SERVER['REMOTE_ADDR'])) $_SERVER['REMOTE_ADDR'] = 'localhost';
@@ -60,14 +59,14 @@
         /*******************************/
 
         /**
-         * @var null|callback|PDO
+         * @var null|callback|\PDO
          */
         public static $pdo = null;
         public static $pdoTableName = '_myprof';
 
         /**
          * Включает отправку писем (если это PHPMailer)
-         * @var null|callback|PHPMailer
+         * @var null|callback|\PHPMailer\PHPMailer\PHPMailer
          */
         public static $mailer = null;
         /**
@@ -393,14 +392,14 @@
 
         /**
          * Получаем PDO соединение с БД
-         * @return PDO|null
+         * @return \PDO|null
          */
         private static function getPdo()
         {
             if (static::$pdo && is_callable(static::$pdo)) {
                 static::$pdo = call_user_func_array(static::$pdo, array());
             }
-            return (static::$pdo instanceof PDO ? static::$pdo : false);
+            return (static::$pdo instanceof \PDO ? static::$pdo : false);
         }
 
         private function setSafeParams() {
@@ -425,7 +424,7 @@
 
         /**
          * Получаем PHPMailer
-         * @return PHPMailer|null
+         * @return \PHPMailer\PHPMailer\PHPMailer|null
          */
         private static function getMailer()
         {
@@ -1159,7 +1158,7 @@
                 }
                 return '<p class="alert alert-danger">'.$err[1].': '.$err[2].'</p>';
             }
-            $counts = $stmt->fetch(PDO::FETCH_ASSOC);
+            $counts = $stmt->fetch(\PDO::FETCH_ASSOC);
             $counts = $counts['cnt'];
             // значение максимальной страницы
             $max_page = ceil($counts / $itemsOnPage);
@@ -1220,7 +1219,7 @@
 
             $stmt = static::getPdo()->prepare($query);
             $stmt->execute();
-            $dataList = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $dataList = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $html = '';
 
