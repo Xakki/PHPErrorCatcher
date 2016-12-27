@@ -15,9 +15,9 @@
     "facebook/xhprof": "dev-master"
   },
   "require-dev": {
-    "phpmailer/phpmailer": "master"
+    "phpmailer/phpmailer": "dev-master"
   },
   "autoload": {
-    "classmap": ["lib/"]
+    "classmap": ["src/"]
   }
 }

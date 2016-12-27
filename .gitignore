@@ -1,3 +1,6 @@
-/.idea/
-/test/tmp/*
+/.idea
+/test
+/example/tmp/
 composer.phar
+composer.lock
+/vendor/
