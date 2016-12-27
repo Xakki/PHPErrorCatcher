@@ -1,5 +1,5 @@
 <?
-    use xakki\PHPErrorCatcher\PHPErrorCatcher;
+    use xakki\phperrorcatcher\PHPErrorCatcher;
 
     /**
      * Подключение для Yii

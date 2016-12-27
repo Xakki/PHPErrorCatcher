@@ -1068,6 +1068,12 @@
                 'callgraph' => 1,
                 'typeahead' => 1,
             );
+            // xhprof настолько древний, что до сих пор общается с глобальными переменными (
+            foreach($_GET as $k=>$r) {
+                global $$k;
+                $$k = $r;
+//                $GLOBALS[$k] = $r;
+            }
             if (isset($_GET['viewSrc'])) {
                 $file = static::$xhprofDir."/xhprof_html/".trim($_GET['viewSrc'], '/\\.');
                 if (file_exists($file)) {
