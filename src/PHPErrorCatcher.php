@@ -128,6 +128,7 @@ class PHPErrorCatcher
      * @var string
      */
     private $allLogs = '';
+    private $overMemory = false;
 
     /**
      * Custom function Time
@@ -259,7 +260,7 @@ class PHPErrorCatcher
             static::$obj->time_cr = microtime(true);
             static::$obj->initProfiler();
         }
-        return static::$obj;
+        return static::$obj ;
     }
 
     public static function initLogView()
@@ -297,11 +298,11 @@ class PHPErrorCatcher
             } else {
                 $this->saveStatsProfiler();
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->handleException($e);
         }
 
-        if ($this->allLogs && static::$hasError) {
+        if (($this->allLogs || $this->overMemory) && static::$hasError) {
             $path = ERROR_VIEW_PATH . ERROR_LOG_DIR . '/' . date('Y.m.d');
             if (!file_exists($path)) {
                 mkdir($path, 0775, true);
@@ -341,9 +342,11 @@ class PHPErrorCatcher
      * @param $errfile
      * @param $errline
      * @param null $vars
-     * @param null $tace
+     * @param null $trace
+     * @param int $slice
+     * @return bool
      */
-    public function handleError($errno, $errstr, $errfile, $errline, $vars = null, $tace = null, $slice = 2)
+    public function handleError($errno, $errstr, $errfile, $errline, $vars = null, $trace = null, $slice = 2)
     {
 
         if (!static::$showNotice && ($errno == E_NOTICE || $errno == E_USER_NOTICE)) {
@@ -356,7 +359,7 @@ class PHPErrorCatcher
 
         $this->count++;
 
-        $debug = static::renderErrorItem($errno, $errstr, $errfile, $errline, $vars, $tace, $slice);
+        $debug = static::renderErrorItem($errno, $errstr, $errfile, $errline, $vars, $trace, $slice);
 
         if (static::$errorListView[$errno]['debug']) { // для нотисов подробности ни к чему
             static::$hasError = true;
@@ -365,7 +368,19 @@ class PHPErrorCatcher
         if (static::$isViewMode || isset($_GET[ERROR_VIEW_GET])) {
             echo $debug;
         }
-        $this->allLogs .= $debug;
+
+        $limitMemory = ini_get('memory_limit');
+        if ($limitMemory > 0) {
+            $limitMemory = (int)$limitMemory * (strpos($limitMemory, 'M') ? 1024 * 1024 : 1024) * 0.8;
+            if (memory_get_usage() < $limitMemory) {
+                $this->allLogs .= $debug;
+            } else {
+                $this->overMemory = true;
+            }
+        } else {
+            $this->allLogs .= $debug;
+        }
+
         return true;
     }
 
@@ -571,6 +586,7 @@ class PHPErrorCatcher
             (count($this->postData) ? PHP_EOL . '<span class="bugs_post">' . json_encode($this->postData) . '</span>' : '') .
             $profilerUrlTag .
             $this->allLogs .
+            ($this->overMemory ? '<hr>Over memory limit' : '').
             '</div>';
     }
 
