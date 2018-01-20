@@ -30,6 +30,12 @@ class PHPErrorCatcher
 {
 
     /**
+     * Callback Error
+     * @var null|callable
+     */
+    public static $errorCallback = null;
+
+    /**
      * If true, all data log into file
      * @var bool
      */
@@ -251,7 +257,7 @@ class PHPErrorCatcher
 
     /**
      * @return PHPErrorCatcher
-     * @throws Exception
+     * @throws \Exception
      */
     public static function init()
     {
@@ -303,15 +309,6 @@ class PHPErrorCatcher
         }
 
         if (($this->allLogs || $this->overMemory) && static::$hasError) {
-            $path = ERROR_VIEW_PATH . ERROR_LOG_DIR . '/' . date('Y.m.d');
-            if (!file_exists($path)) {
-                mkdir($path, 0775, true);
-            }
-
-            $fileName = $path . '/' . date('H') . '.html';
-
-            if (!file_exists($fileName)) $flagNew = true;
-            else $flagNew = false;
 
             $fileLog = $this->renderLogs();
 
@@ -325,13 +322,26 @@ class PHPErrorCatcher
             elseif ($errorMailLog) {
                 $fileLog .= '<div><pre class="bg-danger">Ошибка отправки письма'.PHP_EOL.static::_e($errorMailLog).'</pre></div>';
             }
-
-            file_put_contents($fileName, $fileLog, FILE_APPEND);
-            if ($flagNew) chmod($fileName, 0777);
-
+            self::putData($fileLog);
 
         }
         $this->renderToolbar();
+    }
+
+    private static function putData($fileLog) {
+
+        $path = ERROR_VIEW_PATH . ERROR_LOG_DIR . '/' . date('Y.m.d');
+        if (!file_exists($path)) {
+            mkdir($path, 0775, true);
+        }
+
+        $fileName = $path . '/' . date('H') . '.html';
+
+        if (!file_exists($fileName)) $flagNew = true;
+        else $flagNew = false;
+        file_put_contents($fileName, $fileLog, FILE_APPEND);
+        if ($flagNew) chmod($fileName, 0777);
+
     }
 
 
@@ -361,6 +371,10 @@ class PHPErrorCatcher
 
         $debug = static::renderErrorItem($errno, $errstr, $errfile, $errline, $vars, $trace, $slice);
 
+        if (static::$errorCallback && is_callable(static::$errorCallback)) {
+            call_user_func_array(static::$errorCallback, [$debug, $errno, $errstr, $errfile, $errline, $vars]);
+        }
+
         if (static::$errorListView[$errno]['debug']) { // для нотисов подробности ни к чему
             static::$hasError = true;
             $this->errCount++;
@@ -375,6 +389,8 @@ class PHPErrorCatcher
             if (memory_get_usage() < $limitMemory) {
                 $this->allLogs .= $debug;
             } else {
+                self::putData('<hr>overMemory '.$limitMemory.':<br/>'.$this->allLogs.$debug);
+                $this->allLogs = '';
                 $this->overMemory = true;
             }
         } else {
@@ -382,6 +398,22 @@ class PHPErrorCatcher
         }
 
         return true;
+    }
+
+    public static function handleBug($mess, $data = null, $enableDebug = true, $slice = 1)
+    {
+        $traceArr = debug_backtrace();
+        $errfile = $traceArr[1]['file'];
+        $errline = $traceArr[1]['line'];
+        if (!$enableDebug) {
+            $GLOBALS['skipRenderBackTrace'] = 1;
+        }
+        $errno = E_USER_WARNING;
+
+        if($data)
+            $data .= '<pre>'.var_export($data, true).'</pre>';
+
+        self::init()->handleError($errno, $mess, $errfile, $errline, $data, $traceArr, $slice);
     }
 
     /**
@@ -397,7 +429,7 @@ class PHPErrorCatcher
     /**
      * Получение рендера исключения
      * для малых нужд
-     * @param $e Exception
+     * @param $e \Exception
      * @return string
      */
     public static function getExceptionRender($e)
@@ -536,9 +568,9 @@ class PHPErrorCatcher
             'time_cr' => $this->time_cr,
             'time_run' => $this->time_run,
             'info' => $info,
-            'json_post' => (count($this->postData) ? json_encode($this->postData) : null),
-            'json_cookies' => ((count($this->cookieData) && !$simple) ? json_encode($this->cookieData) : null),
-            'json_session' => ((count($this->sessionData) && !$simple) ? json_encode($this->sessionData) : null),
+            'json_post' => (!empty($this->postData) ? htmlspecialchars(json_encode($this->postData, JSON_UNESCAPED_UNICODE)) : null),
+            'json_cookies' => ((!empty($this->cookieData) && !$simple) ? htmlspecialchars(json_encode($this->cookieData, JSON_UNESCAPED_UNICODE)) : null),
+            'json_session' => ((!empty($this->sessionData) && !$simple) ? htmlspecialchars(json_encode($this->sessionData, JSON_UNESCAPED_UNICODE)) : null),
             'is_secure' => ((isset($_SERVER['HTTPS']) and $_SERVER['HTTPS'] !== 'off') ? true : false),
             'ref' => (!$simple ? $_SERVER['HTTP_REFERER'] : null),
             'script' => $script,
@@ -583,7 +615,7 @@ class PHPErrorCatcher
             '<span class="bugs_uri">' . $_SERVER['REQUEST_URI'] . '</span> ' .
             '<span class="bugs_ip">' . $_SERVER['REMOTE_ADDR'] . '</span> ' .
             ($_SERVER['HTTP_REFERER'] ? '<span class="bugs_ref">' . $_SERVER['HTTP_REFERER'] . '</span> ' : '') .
-            (count($this->postData) ? PHP_EOL . '<span class="bugs_post">' . json_encode($this->postData) . '</span>' : '') .
+            (!empty($this->postData) ? PHP_EOL . '<span class="bugs_post">' . htmlspecialchars(json_encode($this->postData, JSON_UNESCAPED_UNICODE)) . '</span>' : '') .
             $profilerUrlTag .
             $this->allLogs .
             ($this->overMemory ? '<hr>Over memory limit' : '').
@@ -598,10 +630,10 @@ class PHPErrorCatcher
      * @param $errfile
      * @param $errline
      * @param null $vars
-     * @param null $tace
+     * @param null $trace
      * @return string
      */
-    public static function renderErrorItem($errno, $errstr, $errfile, $errline, $vars = null, $tace = null, $slice = 1)
+    public static function renderErrorItem($errno, $errstr, $errfile, $errline, $vars = null, $trace = null, $slice = 1)
     {
         $micro_date = microtime();
         $micro_date = explode(" ", $micro_date);
@@ -609,12 +641,12 @@ class PHPErrorCatcher
             '<span class="bug_time">' . date('Y-m-d H:i:s P', $micro_date[1]) . '</span> ' .
             '<span class="bug_mctime">' . $micro_date[0] . '</span> ' .
             '<span class="bug_type">' . static::$errorListView[$errno]['type'] . '</span> ' .
-            '<span class="bug_vars">' . (is_int($vars) ? $vars : '') . '</span> ' .
+            '<span class="bug_vars">' . ( (!empty($vars) && is_string($vars)) ? $vars : '') . '</span> ' .
             '<span class="bug_str">' . htmlspecialchars($errstr, ENT_NOQUOTES , 'UTF-8') . '</span> ' .
             '<div class="bug_file"> File <a href="file:/' . $errfile . ':' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
 
         if (static::$errorListView[$errno]['debug'] && empty($GLOBALS['skipRenderBackTrace'])) { // для нотисов подробности ни к чему
-            $debug .= static::renderBackTrace($slice, $tace);
+            $debug .= static::renderBackTrace($slice, $trace);
         } else {
             unset($GLOBALS['skipRenderBackTrace']);
             // if (isset($arr['line']) and $arr['file'])
@@ -635,7 +667,7 @@ class PHPErrorCatcher
     {
         $MAXSTRLEN = 1024;
         $s = '<div class="xdebug">';
-        if (!$traceArr) {
+        if (!$traceArr || !is_array($traceArr)) {
             $traceArr = debug_backtrace();
             if ($slice > 0) {
                 $traceArr = array_slice($traceArr, $slice);
@@ -725,6 +757,7 @@ class PHPErrorCatcher
                 (static::getPdo() ? '<li' . ($file == 'BD' ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=BD">BD</a></li>' : '').
                 (static::init()->profilerStatus ? '<li' . ($file == 'PROF' ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=PROF&source=' . static::$profiler_namespace .'&run=">Профаилер</a></li>' : '').
                 '<li' . ($file == 'PHPINFO' ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=PHPINFO">PHPINFO</a></li>'.
+                '<li><a href="?" target="_blank">HOME</a></li>'.
                 '</ul>';
         }
         if (!empty($_GET['download'])) {
@@ -1089,7 +1122,7 @@ class PHPErrorCatcher
         foreach($_GET as $k=>$r) {
             global $$k;
             $$k = $r;
-//                $GLOBALS[$k] = $r;
+            //                $GLOBALS[$k] = $r;
         }
 
         if (isset($_GET['viewSrc'])) {
@@ -1410,6 +1443,16 @@ class PHPErrorCatcher
     public function getAllLogs()
     {
         return $this->allLogs;
+    }
+
+    public function setAllLogs($log)
+    {
+        return $this->allLogs = $log;
+    }
+
+    public function clearAllLogs()
+    {
+        return $this->allLogs = '';
     }
 
     /**
