@@ -22,53 +22,39 @@
     // Для рисования графиков нужна либа graphviz (sudo apt-get install graphviz)
     // естественно чтоб была подключен модуль пхпшный (sudo apt-get install php5-xhprof)
     // если хотите подключить свой "БлэкДжек с девицами" , то вам нужно переопределить метод initProfiler() и endProfiler()
-    // путь к расположению библиотек профаилера
-    PHPErrorCatcher::$xhprofDir = __DIR__ . '/../vendor/lox/xhprof';
-    // профилируем только медленные скрипты, работающие больше 6сек
-    PHPErrorCatcher::$minTimeProfiled = 6000;
-    // Можно профилировать все запросы с переданными параметрами, к примеру
-    if (isset($_COOKIE['prof']) || isset($_GET['prof'])) {
-        PHPErrorCatcher::$xhprofEnable = true;
-    }
-    // dont log session data
-    PHPErrorCatcher::$enableSessionLog = false;
 
-    PHPErrorCatcher::init();
 
-    // Можно передать параметр после инициализации
-    // можете использовать свое, уже созданное подключение
-    PHPErrorCatcher::$pdo = function () {
-        return new PDO("mysql:host=localhost;port=3106;dbname=test", 'testUser', 'testPass');
-    };
-
-    // Для получения писем "счастья" подключаем почту
+    // pdo - array|function можете использовать свое, уже созданное подключение
+    // mailer - function - Для получения писем "счастья" подключаем почту
     // можно использовать свою либу, но чтоб в ней   были атрибуты Body и Subject, и метод Send()
     // ну или можете переопределить метод sendErrorMail()
     // Шаблон темы задан по умолчанию в параметре \PHPErrorCatcher::$mailerSubjectPrefix
 
-    PHPErrorCatcher::$mailer = function () {
-        global $config;
-        $transport = $config['components']['mailer']['transport'];
-        $cmsmailer = new \PHPMailer\PHPMailer\PHPMailer();
-        $cmsmailer->Host = $transport['host'];
-        $cmsmailer->Port = $transport['port'];
-        $cmsmailer->SMTPAuth = true;
-        $cmsmailer->SMTPDebug = 3;
-        $cmsmailer->Username = $transport['username'];
-        $cmsmailer->Password = $transport['password'];
-        $cmsmailer->Sender = $transport['username'];
-        $cmsmailer->FromName = 'PHPErrorCatcher';
-        $cmsmailer->Mailer = 'smtp';
-        $cmsmailer->ContentType = 'text/html';
-        $cmsmailer->CharSet = 'utf-8';
-        $cmsmailer->AddAddress('test@example.ru');
-        return $cmsmailer;
-    };
-
-
-    // Метод инициализации просмотра логов
-    // этот метод вызываем в конце  передачи всех необходимых параметров
-    PHPErrorCatcher::initLogView();
+    PHPErrorCatcher::init([
+        'catcherLogName' => 'myCatcherLog',
+        'pdo' => ['dbname' => 'test', 'username' => 'testUser', 'passwd' => 'testPass'],
+        'mailer' => function () {
+            global $config;
+            $transport = $config['components']['mailer']['transport'];
+            $cmsmailer = new \PHPMailer\PHPMailer\PHPMailer();
+            $cmsmailer->Host = $transport['host'];
+            $cmsmailer->Port = $transport['port'];
+            $cmsmailer->SMTPAuth = true;
+            $cmsmailer->SMTPDebug = 3;
+            $cmsmailer->Username = $transport['username'];
+            $cmsmailer->Password = $transport['password'];
+            $cmsmailer->Sender = $transport['username'];
+            $cmsmailer->FromName = 'PHPErrorCatcher';
+            $cmsmailer->Mailer = 'smtp';
+            $cmsmailer->ContentType = 'text/html';
+            $cmsmailer->CharSet = 'utf-8';
+            $cmsmailer->AddAddress('test@example.ru');
+            return $cmsmailer;
+        },
+        'xhprofEnable' => (isset($_COOKIE['prof']) || isset($_GET['prof'])), // Можно профилировать все запросы с переданными параметрами, к примеру
+        'xhprofDir' => __DIR__ . '/../vendor/lox/xhprof', // путь к расположению библиотек профаилера
+        'minTimeProfiled' => 6000, // профилируем только медленные скрипты, работающие больше 6сек
+    ]);
 
 
     // Выплняем код с ошибкой для теста
