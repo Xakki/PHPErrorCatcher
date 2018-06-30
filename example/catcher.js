@@ -54,7 +54,7 @@ function errorCatcher(msg, url, line, errStack) {
     console.log('ErrException', msg, arg, url);
 
     var xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("POST", '/index.php?errorsJs=' + (new Date().getTime() / 1000), true);
+    xmlhttp.open("POST", '/?myCatcherLog=' + (new Date().getTime() / 1000), true);
     xmlhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
     xmlhttp.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     var query = 'm=' + encodeURIComponent(msg) +
