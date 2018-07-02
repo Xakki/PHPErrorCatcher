@@ -751,13 +751,29 @@ class PHPErrorCatcher
         if ($this->_profilerUrl) {
             $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
         }
-
-        return '<div class="bugs">' .
+        $res = '<div class="bugs">' .
             '<span class="bugs_host">' . $_SERVER['HTTP_HOST'] . '</span> ' .
-            '<span class="bugs_uri">' . $_SERVER['REQUEST_URI'] . '</span> ' .
+            '<span class="bugs_uri">' . mb_substr($_SERVER['REQUEST_URI'], 0, 500) . '</span> ' .
             '<span class="bugs_ip">' . $_SERVER['REMOTE_ADDR'] . '</span> ' .
-            ($_SERVER['HTTP_REFERER'] ? '<span class="bugs_ref">' . $_SERVER['HTTP_REFERER'] . '</span> ' : '') .
-            (!empty($this->_postData) ? PHP_EOL . '<span class="bugs_post">' . self::_e(json_encode($this->_postData, JSON_UNESCAPED_UNICODE)) . '</span>' : '') .
+            ($_SERVER['HTTP_REFERER'] ? '<span class="bugs_ref">' . mb_substr($_SERVER['HTTP_REFERER'], 0, 500) . '</span> ' : '');
+        if (!empty($this->_postData)) {
+            $cntArr = count($this->_postData);
+            if ($cntArr > 10) {
+                $this->_postData = array_slice($this->_postData, 0, 10);
+            }
+            $this->_postData = array_map(function($val){
+                if (mb_strlen($val)>64) return mb_substr($val, 0, 64).'...';
+                elseif(is_array($val)) {
+                    $cnt1 = count($val);
+                    if ($cnt1>10) $val = array_slice($val, 0, 10);
+                    return ' [<'.implode(', ', array_keys($val)).'> '.($cnt1>count($val) ? '...'.$cnt1 : '').'] ';
+                }
+                return $val;
+            }, $this->_postData);
+            $res .= PHP_EOL . '<span class="bugs_post">' . self::_e(json_encode($this->_postData, JSON_UNESCAPED_UNICODE)) .
+                ($cntArr>count($this->_postData) ? '...'.$cntArr : '').'</span>';
+        }
+        return  $res.
             $profilerUrlTag .
             $this->_allLogs .
             ($this->_overMemory ? '<hr>Over memory limit' : '') .
@@ -780,12 +796,42 @@ class PHPErrorCatcher
     {
         $micro_date = microtime();
         $micro_date = explode(" ", $micro_date);
-        if ($vars && (is_string($vars) || is_array($vars))) {
-            $size = mb_strlen(serialize((array) $vars), '8bit');
-            if ($size>5048) $vars = '...(vars size = '.$size.'b)...';
-            elseif(!is_string($vars)) $vars = self::_e(var_export($vars, true));
-        } else {
-            $vars = '';
+        if ($vars) {
+
+            if (is_object($vars)) {
+                $vars = 'Object: '.get_class($vars);
+            }
+            elseif (is_string($vars)) {
+                $size = mb_strlen($vars, '8bit');
+                if ($size > 512) $vars = 'STRING:  '.mb_substr($vars, 0, 500).'...(vars size = ' . $size . 'b)...';
+                elseif (!is_string($vars)) $vars = 'STRING: '.self::_e($vars);
+            }
+            elseif (is_array($vars)) {
+                $vv = 'Array: ['.PHP_EOL;
+                foreach ($vars as $k=>$r) {
+                    $vv .= "\t".(string)$k.' => ';
+                    if (is_array($r)) {
+                        $vv .= 'Array: ['.implode('], [',array_keys($r)).']'.PHP_EOL;
+                    }
+                    elseif(is_object($r)) {
+                        $vv .= 'Object: '.get_class($r).PHP_EOL;
+                    }
+                    else {
+                        $vv .= mb_substr($r, 0, 128).PHP_EOL;
+                    }
+                }
+                $vv .= ']'.PHP_EOL;
+                $vars = $vv;
+//                $size = mb_strlen(json_encode($vars), '8bit');
+//                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
+//                elseif (!is_string($vars)) $vars = 'ARRAY: '.self::_e(var_export($vars, true));
+            }
+            elseif(is_resource($vars)) {
+                $vars = 'RESOURCE: '.get_resource_type($vars);
+            }
+            else {
+                $vars = 'OVER: '.self::_e(var_export($vars, true));
+            }
         }
         $debug = '<div class="bug_item bug_' . $errno . '">' .
             '<span class="bug_time">' . date('Y-m-d H:i:s P', $micro_date[1]) . '</span>' .
