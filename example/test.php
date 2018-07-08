@@ -1,16 +1,12 @@
 <?
     use xakki\phperrorcatcher\PHPErrorCatcher;
 
-    /**
-     * Подключение для Yii
-     */
-    defined('ERROR_VIEW_PATH') || define('ERROR_VIEW_PATH', __DIR__ . "/tmp");  // absolute path for view dir
-    defined('ERROR_VIEW_GET') || define('ERROR_VIEW_GET', 'showLogs');      // url view logs http://exaple.com/?showMeLogs=1
-    defined('ERROR_LOG_DIR') || define("ERROR_LOG_DIR", "/logsError");
-    defined('ERROR_BACKUP_DIR') || define('ERROR_BACKUP_DIR', '/_backUp'); // Backup relative dir / Only inside ERROR_VIEW_PATH
-    if (isset($_COOKIE['debug']) || isset($_GET['debug'])) {
-        defined('ERROR_DEBUG_MODE') || define('ERROR_DEBUG_MODE', true); // будет отображатся плашка
-    }
+//defined('ERROR_VIEW_PATH') || define('ERROR_VIEW_PATH', __DIR__ . "/tmp");  // absolute path for view dir
+//defined('ERROR_VIEW_GET') || define('ERROR_VIEW_GET', 'showLogs');      // url view logs http://exaple.com/?showMeLogs=1
+//defined('ERROR_LOG_DIR') || define("ERROR_LOG_DIR", "/logsError");
+//defined('ERROR_BACKUP_DIR') || define('ERROR_BACKUP_DIR', '/_backUp'); // Backup relative dir / Only inside ERROR_VIEW_PATH
+//defined('ERROR_DEBUG_MODE') || define('ERROR_DEBUG_MODE', true); // будет отображатся плашка
+
     $PHPErrorCatcherLib = __DIR__ . '/../src/PHPErrorCatcher.php';
     if (!file_exists($PHPErrorCatcherLib)) return;
 
@@ -31,6 +27,8 @@
     // Шаблон темы задан по умолчанию в параметре \PHPErrorCatcher::$mailerSubjectPrefix
 
     PHPErrorCatcher::init([
+        'logPath' => __DIR__ . '/runtime/log',
+        'debugMode' => (isset($_COOKIE['debug']) || isset($_GET['debug'])),
         'catcherLogName' => 'myCatcherLog',
         'pdo' => ['dbname' => 'test', 'username' => 'testUser', 'passwd' => 'testPass'],
         'mailer' => function () {

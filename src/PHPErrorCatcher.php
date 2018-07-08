@@ -2,15 +2,6 @@
 
 namespace xakki\phperrorcatcher;
 
-if (
-    !defined('ERROR_VIEW_GET')      // url view logs http://exaple.com/?showMeLogs=1
-    || !defined('ERROR_VIEW_PATH')  // absolute path for view dir
-    || !defined('ERROR_BACKUP_DIR') // Backup relative dir / Only inside ERROR_VIEW_PATH
-    || !defined('ERROR_LOG_DIR') // Backup relative dir / Only inside ERROR_LOG_DIR
-) {
-    exit('Not defined constants for PHPErrorCatcher!!!');
-}
-
 // Дописываем параметры для консольного запуска скрипта
 if (!isset($_SERVER['HTTP_HOST'])) $_SERVER['HTTP_HOST'] = 'console';
 if (!isset($_SERVER['REQUEST_URI'])) $_SERVER['REQUEST_URI'] = '*';
@@ -33,6 +24,13 @@ class PHPErrorCatcher
     /************************************/
     // Config
     /************************************/
+
+    private $logPath = '';//ERROR_VIEW_PATH
+    private $logDir = '/logsError';//ERROR_LOG_DIR
+    private $backUpDir = '/_backUp'; // ERROR_BACKUP_DIR // use in PHPErrorViewer
+    private $viewKey = 'showLogs';//ERROR_VIEW_GET
+    private $debugMode = false;//ERROR_DEBUG_MODE
+
 
     /**
      * If you want enable log-request, set this name
@@ -282,6 +280,8 @@ class PHPErrorCatcher
 
     public function __construct($config = [])
     {
+        if (empty($config['logPath'])) exit('Empty logPath');
+
         register_shutdown_function(array($this, 'shutdown'));
         set_error_handler(array($this, 'handleError'), E_ALL);
         set_exception_handler(array($this, 'handleException'));
@@ -359,7 +359,7 @@ class PHPErrorCatcher
     }
     public function initLogView()
     {
-        if (isset($_GET[ERROR_VIEW_GET])) {
+        if (isset($_GET[$this->viewKey])) {
             $this->_isViewMode = true;
             $this->_viewComponent = new PHPErrorViewer($this);
             $this->_viewComponent->renderView();
@@ -421,7 +421,7 @@ class PHPErrorCatcher
 
     private function putData($fileLog, $fileName = 'H')
     {
-        $path = ERROR_VIEW_PATH . ERROR_LOG_DIR . '/' . date('Y.m.d');
+        $path = $this->logPath . $this->logDir . '/' . date('Y.m.d');
         if (!file_exists($path)) {
             mkdir($path, 0775, true);
         }
@@ -474,7 +474,7 @@ class PHPErrorCatcher
             $this->_hasError = true;
             $this->_errCount++;
         }
-        if ($this->_isViewMode || isset($_GET[ERROR_VIEW_GET])) {
+        if ($this->_isViewMode || isset($_GET[$this->viewKey])) {
             echo $debug;
         }
 
@@ -646,7 +646,7 @@ class PHPErrorCatcher
 
         $lib1 = $this->xhprofDir . '/xhprof_lib/utils/xhprof_lib.php';
         $lib2 = $this->xhprofDir . '/xhprof_lib/utils/xhprof_runs.php';
-        $tmpDir = ERROR_VIEW_PATH . '/xhprof';
+        $tmpDir = $this->logPath . '/xhprof';
         if (extension_loaded('xhprof') && file_exists($lib1) && file_exists($lib2)) {
             if (!file_exists($tmpDir)) {
                 if (!mkdir($tmpDir, 0775, true)) {
@@ -685,9 +685,9 @@ class PHPErrorCatcher
         return null;
     }
 
-    public  function getXhprofUrl($id = '')
+    public function getXhprofUrl($id = '')
     {
-        return '?' . ERROR_VIEW_GET . '=PROF&source=' . $this->profiler_namespace . '&run=' . $id;
+        return '?' . $this->viewKey . '=PROF&source=' . $this->profiler_namespace . '&run=' . $id;
     }
 
     /**
@@ -921,16 +921,16 @@ class PHPErrorCatcher
 
     public function renderToolbar()
     {
-        if (!$this->_isViewMode && defined('ERROR_DEBUG_MODE') && ERROR_DEBUG_MODE) {
+        if (!$this->_isViewMode && $this->debugMode) {
             echo '<div class="x-debug-toolbar"><style>
 .x-debug-toolbar {position: fixed; z-index:9999; top: 5px; left: 5px; max-width: 300px;}
 </style>';
-            echo '<p class="alert alert-info"><a href="?' . ERROR_VIEW_GET . '=/">View Logs</a></p>';
+            echo '<p class="alert alert-info"><a href="?' . $this->viewKey . '=/">View Logs</a></p>';
             if ($this->_profilerStatus && static::init()->_profilerId) {
                 echo '<p class="alert alert-info"><a href="' . self::getProfilerUrl() . '">Profiler ' . $this->_profilerId . '</a></p>';
             }
             if ($this->_hasError) {
-                echo '<p class="alert alert-danger"><a href="?' . ERROR_VIEW_GET . '=/">Error ' . static::getErrCount() . '</a></p>';
+                echo '<p class="alert alert-danger"><a href="?' . $this->viewKey . '=/">Error ' . static::getErrCount() . '</a></p>';
             }
             foreach ($this->_viewAlert as $r) {
                 echo '<p class="alert alert-warning">' . $r . '</p>';

@@ -20,7 +20,7 @@ class PHPErrorViewer
     public function renderView()
     {
         ini_set("memory_limit", "128M");
-        $url = str_replace(array('\\', '\/\/', '\.\/', '\.\.'), '', $_GET[ERROR_VIEW_GET]);
+        $url = str_replace(array('\\', '\/\/', '\.\/', '\.\.'), '', $_GET[$this->owner->get('viewKey')]);
 
         $file = trim($url, '/');
         $tabs = array(
@@ -39,10 +39,10 @@ class PHPErrorViewer
             echo '<html>'.$this->renderViewHead($file) . '<body>';
 
             echo '<ul class="nav nav-tabs">' .
-                '<li' . (!isset($tabs[$file]) ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=/">Логи</a></li>' .
-                ($this->owner->getPdo() ? '<li' . ($file == 'BD' ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=BD">BD</a></li>' : '') .
-                ($this->owner->get('_profilerStatus') ? '<li' . ($file == 'PROF' ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=PROF&source=' . $this->owner->get('profiler_namespace'). '&run=">Профаилер</a></li>' : '') .
-                '<li' . ($file == 'PHPINFO' ? ' class="active"' : '') . '><a href="?' . ERROR_VIEW_GET . '=PHPINFO">PHPINFO</a></li>' .
+                '<li' . (!isset($tabs[$file]) ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=/">Логи</a></li>' .
+                ($this->owner->getPdo() ? '<li' . ($file == 'BD' ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=BD">BD</a></li>' : '') .
+                ($this->owner->get('_profilerStatus') ? '<li' . ($file == 'PROF' ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=PROF&source=' . $this->owner->get('profiler_namespace'). '&run=">Профаилер</a></li>' : '') .
+                '<li' . ($file == 'PHPINFO' ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=PHPINFO">PHPINFO</a></li>' .
                 '<li><a href="?" target="_blank">HOME</a></li>' .
                 '</ul>';
         }
@@ -61,7 +61,7 @@ class PHPErrorViewer
             ob_end_clean();
             echo $html;
         } else {
-            $file = ERROR_VIEW_PATH . '/' . $file;
+            $file = $this->owner->get('logPath') . '/' . $file;
 
             if (file_exists($file)) {
 
@@ -81,7 +81,7 @@ class PHPErrorViewer
                     if (!isset($_GET['only'])) {
                         echo $this->renderViewBreadCrumb($url);
 
-                        if (!self::checkIsBackUp($file)) {
+                        if (!$this->checkIsBackUp($file)) {
                             echo ' [<a href="' . $_SERVER['REQUEST_URI'] . '&only=1&download=1" class="linkSource">Download</a> <a href="' . $_SERVER['REQUEST_URI'] . '&only=1" class="linkSource">Source</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=do">Бекап</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=del">Удалить</a>]';
                         }
                         echo '</h3>';
@@ -193,21 +193,21 @@ class PHPErrorViewer
     {
         $dirList1 = $dirList2 = array();
         $path = trim($path, '/.');
-        $fullPath = ERROR_VIEW_PATH . ($path ? '/' . $path : '');
+        $fullPath = $this->owner->get('logPath') . ($path ? '/' . $path : '');
 
         if (!file_exists($fullPath)) {
             if (!mkdir($fullPath, 0775, true)) {
                 exit(' Cant create dir ' . $fullPath);
             }
         }
-        $isBackUpDir = self::checkIsBackUp($fullPath);
+        $isBackUpDir = $this->checkIsBackUp($fullPath);
         $dir = dir($fullPath);
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
         $pathUrl = rtrim($url['path'], '/');
         while (false !== ($entry = $dir->read())) {
             if ($entry != '.' && $entry != '..') {
-                $fileUrl = $pathUrl . '/?' . ERROR_VIEW_GET . '=' . $path . '/' . $entry;
+                $fileUrl = $pathUrl . '/?' . $this->owner->get('viewKey') . '=' . $path . '/' . $entry;
                 $filePath = $fullPath . '/' . $entry;
 
 
@@ -223,7 +223,7 @@ class PHPErrorViewer
                         $dirList2[$entry] = array($path . '/' . $entry, '', '', '', '');
                         continue;
                     }
-                    //                    trigger_error(ERROR_VIEW_PATH . ' * ' . $path . ' * ' . $entry. '=> '.$filePath, E_USER_DEPRECATED);
+                    //                    trigger_error($this->owner->get('logPath') . ' * ' . $path . ' * ' . $entry. '=> '.$filePath, E_USER_DEPRECATED);
                     $size = filesize($filePath);
                     $createTime = filemtime($filePath);
                     $create = date("Y-m-d H:i:s", $createTime);
@@ -235,7 +235,7 @@ class PHPErrorViewer
                     $size,
                     $create,
                     ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Source</a>' : '') .
-                    ((!$isBackUpDir && ($path || !static::checkIsBackUp($filePath))) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
+                    ((!$isBackUpDir && ($path || !$this->checkIsBackUp($filePath))) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
                     $createTime
                 );
                 // glyphicon glyphicon-hdd
@@ -286,7 +286,7 @@ class PHPErrorViewer
 
         if (is_dir($file)) {
             echo 'Is Dir';
-        } elseif (static::checkIsBackUp($file)) {
+        } elseif ($this->checkIsBackUp($file)) {
             echo 'Is BackUp Dir: is protect  dir';
         }
         if (defined('ERROR_NO_BACKUP')) {
@@ -294,7 +294,7 @@ class PHPErrorViewer
             header('Location: ' . $_SERVER['HTTP_REFERER']);
         } else {
 
-            $backUpFile = str_replace(ERROR_VIEW_PATH, ERROR_VIEW_PATH . ERROR_BACKUP_DIR, $file);
+            $backUpFile = str_replace($this->owner->get('logPath'), $this->owner->get('logPath') . $this->owner->get('backUpDir'), $file);
             $backUpFileDir = dirname($backUpFile);
             if (!file_exists($backUpFileDir)) {
                 mkdir($backUpFileDir, 0775, true);
@@ -310,11 +310,11 @@ class PHPErrorViewer
 
             if (copy($file, $backUpFile)) {
                 $loc = str_replace(array('&backup=do', '&backup=del'), '', $_SERVER['REQUEST_URI']);
-                $backUpFileUrl = str_replace($_GET[ERROR_VIEW_GET], str_replace(ERROR_VIEW_PATH, '', $backUpFile), $loc);
+                $backUpFileUrl = str_replace($_GET[$this->owner->get('viewKey')], str_replace($this->owner->get('logPath'), '', $backUpFile), $loc);
 
                 // add info
                 file_put_contents($backUpFile, '<a href="' . $loc . '">This backup file in ' . date('Y-m-d H:i:s') . ' from origin</a><hr/>' . PHP_EOL . file_get_contents($backUpFile));
-                if ($_GET['backup'] == 'del' and strpos($file, ERROR_VIEW_PATH . ERROR_BACKUP_DIR) === false) {
+                if ($_GET['backup'] == 'del' and strpos($file, $this->owner->get('logPath') . $this->owner->get('backUpDir')) === false) {
                     unlink($file);
                     $i = pathinfo($file);
                     header('Location: ' . str_replace('/' . $i['filename'] . '.' . $i['extension'], '', $_SERVER['HTTP_REFERER']));
@@ -342,7 +342,7 @@ class PHPErrorViewer
         if (defined('ERROR_NO_BACKUP')) {
             static::delTree($dir);
         } else {
-            $backUpFileDir = str_replace(ERROR_VIEW_PATH, ERROR_VIEW_PATH . ERROR_BACKUP_DIR, $dir);
+            $backUpFileDir = str_replace($this->owner->get('logPath'), $this->owner->get('logPath') . $this->owner->get('backUpDir'), $dir);
             if (file_exists($backUpFileDir)) {
                 $backUpFileDir = rtrim($backUpFileDir, '/') . '_' . time();
             } else {
@@ -369,7 +369,7 @@ class PHPErrorViewer
         $ctr = '';
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
-        $basePath = $fullPath = rtrim($url['path'], '/') . '/?' . ERROR_VIEW_GET . '=/';
+        $basePath = $fullPath = rtrim($url['path'], '/') . '/?' . $this->owner->get('viewKey') . '=/';
         foreach ($temp as $r) {
             $fullPath .= '/' . $r;
             $ctr .= '<li><a href="' . $fullPath . '">' . $r . '</a>';
@@ -406,7 +406,7 @@ class PHPErrorViewer
             }
             exit('File not found');
         }
-        ini_set("xhprof.output_dir", ERROR_VIEW_PATH . '/xhprof');
+        ini_set("xhprof.output_dir", $this->owner->get('logPath') . '/xhprof');
         ob_start();
         $xfile = $this->owner->get('xhprofDir') . '/xhprof_html/' . ((isset($_GET['viewInc']) && isset($allowInc[$_GET['viewInc']])) ? $_GET['viewInc'] : 'index') . '.php';
         if (file_exists($xfile)) include $xfile;
@@ -422,12 +422,12 @@ class PHPErrorViewer
                 'a href="/callgraph.php?',
                 'a href="/typeahead.php?'
             ), array(
-                'link href=\'?' . ERROR_VIEW_GET . '=PROF&only=1&viewSrc=',
-                'script src=\'?' . ERROR_VIEW_GET . '=PROF&only=1&viewSrc=',
-                'a href="?' . ERROR_VIEW_GET . '=PROF&',
-                'a href="?' . ERROR_VIEW_GET . '=PROF&',
-                'a href="?' . ERROR_VIEW_GET . '=PROF&only=1&viewInc=callgraph&',
-                'a href="?' . ERROR_VIEW_GET . '=PROF&&viewInc=typeahead&'
+                'link href=\'?' . $this->owner->get('viewKey') . '=PROF&only=1&viewSrc=',
+                'script src=\'?' . $this->owner->get('viewKey') . '=PROF&only=1&viewSrc=',
+                'a href="?' . $this->owner->get('viewKey') . '=PROF&',
+                'a href="?' . $this->owner->get('viewKey') . '=PROF&',
+                'a href="?' . $this->owner->get('viewKey') . '=PROF&only=1&viewInc=callgraph&',
+                'a href="?' . $this->owner->get('viewKey') . '=PROF&&viewInc=typeahead&'
             ), $html);
         }
         ob_end_clean();
@@ -697,9 +697,9 @@ class PHPErrorViewer
     }
 
 
-    private static function checkIsBackUp($file)
+    private function checkIsBackUp($file)
     {
-        return (strpos($file, ERROR_VIEW_PATH . ERROR_BACKUP_DIR) !== false);
+        return (strpos($file, $this->owner->get('logPath') . $this->owner->get('backUpDir')) !== false);
     }
 
 
