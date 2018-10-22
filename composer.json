@@ -19,7 +19,7 @@
   },
   "require-dev": {
     "lox/xhprof": "dev-master",
-    "phpmailer/phpmailer": "v6.0.0rc3"
+    "phpmailer/phpmailer": "^6.0.5"
   },
   "autoload": {
     "psr-4": {

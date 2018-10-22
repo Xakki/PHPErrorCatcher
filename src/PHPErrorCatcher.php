@@ -68,7 +68,7 @@ class PHPErrorCatcher
      * If xhprofEnable=true then save only if time more this property
      * @var int
      */
-    private  $minTimeProfiled = 4000999999;
+    private $minTimeProfiled = 4000999999;
 
     /**
      * location source profiler xhprof
@@ -270,16 +270,14 @@ class PHPErrorCatcher
      * @param array $config
      * @return PHPErrorCatcher
      */
-    public static function init($config = [])
-    {
+    public static function init($config = []) {
         if (!static::$_obj) {
             static::$_obj = new self($config);
         }
         return static::$_obj;
     }
 
-    public function __construct($config = [])
-    {
+    public function __construct($config = []) {
         if (empty($config['logPath'])) exit('Empty logPath');
 
         register_shutdown_function(array($this, 'shutdown'));
@@ -300,7 +298,7 @@ class PHPErrorCatcher
     }
 
     public function applyConfig($config) {
-        foreach ($config as $key=>$value) {
+        foreach ($config as $key => $value) {
             if (property_exists($this, $key) && substr($key, 0, 1) != '_') {
                 $this->$key = $value;
             }
@@ -323,12 +321,11 @@ class PHPErrorCatcher
     /**
      * Use catche.js for log error in javascript
      */
-    public function initLogRequest()
-    {
-        if (isset($_GET[$this->catcherLogName]) && count($_POST)>2) {
+    public function initLogRequest() {
+        if (isset($_GET[$this->catcherLogName]) && count($_POST) > 2) {
             $errstr = $_POST['m'];
-            $size = mb_strlen(serialize((array) $errstr), '8bit');
-            if ($size>1500) $errstr = mb_substr($errstr, 0, 1000).'...('.$size.'b)...';
+            $size = mb_strlen(serialize((array)$errstr), '8bit');
+            if ($size > 1500) $errstr = mb_substr($errstr, 0, 1000) . '...(' . $size . 'b)...';
             $vars = [
                 'url' => $_POST['u'],
                 'ua' => $_SERVER['HTTP_USER_AGENT'],
@@ -357,8 +354,8 @@ class PHPErrorCatcher
             exit();
         }
     }
-    public function initLogView()
-    {
+
+    public function initLogView() {
         if (isset($_GET[$this->viewKey])) {
             $this->_isViewMode = true;
             $this->_viewComponent = new PHPErrorViewer($this);
@@ -370,8 +367,7 @@ class PHPErrorCatcher
     /**
      * Процедура завершения скрипта
      */
-    public function shutdown()
-    {
+    public function shutdown() {
         $this->_time_end = (microtime(true) - $this->_time_start) * 1000;
 
         $error = error_get_last();
@@ -419,16 +415,15 @@ class PHPErrorCatcher
         $this->renderToolbar();
     }
 
-    private function putData($fileLog, $fileName = 'H')
-    {
+    private function putData($fileLog, $fileName = 'H') {
         $path = $this->logPath . $this->logDir . '/' . date('Y.m.d');
         if (!file_exists($path)) {
             mkdir($path, 0775, true);
         }
 
-        if ($fileName==='H')
+        if ($fileName === 'H')
             $fileName = $path . '/' . date('H') . '.html';
-        elseif(is_string($fileName))
+        elseif (is_string($fileName))
             $fileName = $path . '/' . $fileName . '.html';
         else
             $fileName = $path . '/error.html';
@@ -451,8 +446,7 @@ class PHPErrorCatcher
      * @param int $slice
      * @return bool
      */
-    public function handleError($errno, $errstr, $errfile, $errline, $vars = null, $trace = null, $slice = 3)
-    {
+    public function handleError($errno, $errstr, $errfile, $errline, $vars = null, $trace = null, $slice = 3) {
 
         if (!$this->showNotice && ($errno == E_NOTICE || $errno == E_USER_NOTICE)) {
             return true;
@@ -474,7 +468,7 @@ class PHPErrorCatcher
             $this->_hasError = true;
             $this->_errCount++;
         }
-        if ($this->_isViewMode || isset($_GET[$this->viewKey])) {
+        if ($this->_isViewMode) {
             echo $debug;
         }
 
@@ -495,20 +489,18 @@ class PHPErrorCatcher
         return true;
     }
 
-    public static function logError($mess, $data = null, $enableDebug = true, $slice = 1)
-    {
+    public static function logError($mess, $data = null, $enableDebug = true, $slice = 1) {
         $traceArr = debug_backtrace();
-        $errfile = $traceArr[1]['file'];
-        $errline = $traceArr[1]['line'];
+        $errfile = $traceArr[$slice]['file'];
+        $errline = $traceArr[$slice]['line'];
         if (!$enableDebug) {
             $GLOBALS['skipRenderBackTrace'] = 1;
         }
         $errno = E_USER_WARNING;
 
         if ($data)
-            $data .= '<pre>' . var_export($data, true) . '</pre>';
-
-        self::init()->handleError($errno, $mess, $errfile, $errline, $data, $traceArr, $slice);
+            $data .= '<pre>' . self::renderVars($data) . '</pre>';
+        self::init()->handleError($errno, $mess, $errfile, $errline, $data, array_slice($traceArr, $slice));
     }
 
     /**
@@ -516,13 +508,11 @@ class PHPErrorCatcher
      * @param $e \Exception
      * @param string $mess
      */
-    public function handleException($e, $mess = '')
-    {
+    public function handleException($e, $mess = '') {
         $this->handleError(E_EXCEPTION_ERROR, $e->getMessage() . ($mess ? '<br/>' . $mess : ''), $e->getFile(), $e->getLine(), $e->getCode(), $e->getTrace(), 2);
     }
 
-    public static function logException($e, $mess = '')
-    {
+    public static function logException($e, $mess = '') {
         self::init()->handleException($e, $mess);
     }
 
@@ -531,8 +521,7 @@ class PHPErrorCatcher
      * @param $e \Exception
      * @return string
      */
-    public static function getExceptionRender($e)
-    {
+    public static function getExceptionRender($e) {
         return self::init()->renderErrorItem(E_EXCEPTION_ERROR, $e->getMessage(), $e->getFile(), $e->getLine(), $e->getCode(), $e->getTrace());
     }
 
@@ -542,8 +531,7 @@ class PHPErrorCatcher
      * Получаем PDO соединение с БД
      * @return \PDO|null
      */
-    public function getPdo()
-    {
+    public function getPdo() {
         if ($this->pdo && is_array($this->pdo)) {
             $this->pdo = array_merge([
                 'engine' => 'mysql',
@@ -554,24 +542,22 @@ class PHPErrorCatcher
                 'passwd' => 'test',
                 'options' => [],
             ], $this->pdo);
-            $this->pdo =  new \PDO($this->pdo['engine'].':host='.$this->pdo['host'].';port='.$this->pdo['port'].';dbname='.$this->pdo['dbname'],
+            $this->pdo = new \PDO($this->pdo['engine'] . ':host=' . $this->pdo['host'] . ';port=' . $this->pdo['port'] . ';dbname=' . $this->pdo['dbname'],
                 $this->pdo['username'], $this->pdo['passwd'], $this->pdo['options']);
-        }
-        elseif ($this->pdo && is_callable($this->pdo)) {
+        } elseif ($this->pdo && is_callable($this->pdo)) {
             $this->pdo = call_user_func_array($this->pdo, array());
         }
         return ($this->pdo instanceof \PDO ? $this->pdo : null);
     }
 
-    private function setSafeParams()
-    {
+    private function setSafeParams() {
         if ($this->_postData !== null) return;
 
         if ($_POST) {
-            foreach ($_POST as $k=>$p) {
+            foreach ($_POST as $k => $p) {
                 $size = mb_strlen(serialize((array)$this->_postData[$k]), '8bit');
                 if ($size > 1024)
-                    $this->_postData[$k] = '...('.$size.'b)...';
+                    $this->_postData[$k] = '...(' . $size . 'b)...';
                 else
                     $this->_postData[$k] = $p;
             }
@@ -607,8 +593,7 @@ class PHPErrorCatcher
      * Получаем PHPMailer
      * @return \PHPMailer\PHPMailer\PHPMailer|null
      */
-    private function getMailer()
-    {
+    private function getMailer() {
         if ($this->mailer && is_callable($this->mailer)) {
             $this->mailer = call_user_func_array($this->mailer, array());
         }
@@ -620,8 +605,7 @@ class PHPErrorCatcher
      * @param $message
      * @return bool
      */
-    private function sendErrorMail($message)
-    {
+    private function sendErrorMail($message) {
         try {
             $cmsmailer = $this->getMailer();
             if (!$cmsmailer) return false;
@@ -640,8 +624,7 @@ class PHPErrorCatcher
     /**
      * Запуск профайлера
      */
-    public function initProfiler()
-    {
+    public function initProfiler() {
         if (!$this->xhprofDir || $this->_profilerStatus) return;
 
         $lib1 = $this->xhprofDir . '/xhprof_lib/utils/xhprof_lib.php';
@@ -668,8 +651,7 @@ class PHPErrorCatcher
      * Завершение и сохранение профайлера
      * @return null|string
      */
-    public function endProfiler()
-    {
+    public function endProfiler() {
         if ($this->_profilerStatus) {
             $xhprof_data = xhprof_disable();
             if ($this->_time_end > $this->minTimeProfiled || $this->xhprofEnable) {
@@ -685,8 +667,7 @@ class PHPErrorCatcher
         return null;
     }
 
-    public function getXhprofUrl($id = '')
-    {
+    public function getXhprofUrl($id = '') {
         return '?' . $this->viewKey . '=PROF&source=' . $this->profiler_namespace . '&run=' . $id;
     }
 
@@ -697,8 +678,7 @@ class PHPErrorCatcher
      * @param bool|false $simple
      * @return bool
      */
-    public function saveStatsProfiler($script = null, $info = null, $simple = false)
-    {
+    public function saveStatsProfiler($script = null, $info = null, $simple = false) {
         $this->setSafeParams();
         if (is_null($script)) {
             $script = $_SERVER['SCRIPT_NAME'];
@@ -740,8 +720,7 @@ class PHPErrorCatcher
      * Финальный рендер лога
      * @return string
      */
-    private function renderLogs()
-    {
+    private function renderLogs() {
         $this->setSafeParams();
         $profilerUrlTag = '';
         if ($this->enableSessionLog) {
@@ -755,25 +734,25 @@ class PHPErrorCatcher
             '<span class="bugs_host">' . $_SERVER['HTTP_HOST'] . '</span> ' .
             '<span class="bugs_uri">' . mb_substr($_SERVER['REQUEST_URI'], 0, 500) . '</span> ' .
             '<span class="bugs_ip">' . $_SERVER['REMOTE_ADDR'] . '</span> ' .
-            ($_SERVER['HTTP_REFERER'] ? '<span class="bugs_ref">' . mb_substr($_SERVER['HTTP_REFERER'], 0, 500) . '</span> ' : '');
+            (!empty($_SERVER['HTTP_REFERER']) ? '<span class="bugs_ref">' . mb_substr($_SERVER['HTTP_REFERER'], 0, 500) . '</span> ' : '');
         if (!empty($this->_postData)) {
             $cntArr = count($this->_postData);
             if ($cntArr > 10) {
                 $this->_postData = array_slice($this->_postData, 0, 10);
             }
-            $this->_postData = array_map(function($val){
-                if (mb_strlen($val)>64) return mb_substr($val, 0, 64).'...';
-                elseif(is_array($val)) {
+            $this->_postData = array_map(function ($val) {
+                if (mb_strlen($val) > 64) return mb_substr($val, 0, 64) . '...';
+                elseif (is_array($val)) {
                     $cnt1 = count($val);
-                    if ($cnt1>10) $val = array_slice($val, 0, 10);
-                    return ' [<'.implode(', ', array_keys($val)).'> '.($cnt1>count($val) ? '...'.$cnt1 : '').'] ';
+                    if ($cnt1 > 10) $val = array_slice($val, 0, 10);
+                    return ' [<' . implode(', ', array_keys($val)) . '> ' . ($cnt1 > count($val) ? '...' . $cnt1 : '') . '] ';
                 }
                 return $val;
             }, $this->_postData);
             $res .= PHP_EOL . '<span class="bugs_post">' . self::_e(json_encode($this->_postData, JSON_UNESCAPED_UNICODE)) .
-                ($cntArr>count($this->_postData) ? '...'.$cntArr : '').'</span>';
+                ($cntArr > count($this->_postData) ? '...' . $cntArr : '') . '</span>';
         }
-        return  $res.
+        return $res .
             $profilerUrlTag .
             $this->_allLogs .
             ($this->_overMemory ? '<hr>Over memory limit' : '') .
@@ -792,58 +771,23 @@ class PHPErrorCatcher
      * @param int $slice
      * @return string
      */
-    public function renderErrorItem($errno, $errstr, $errfile, $errline, $vars = null, $trace = null, $slice = 1)
-    {
+    public function renderErrorItem($errno, $errstr, $errfile, $errline, $vars = null, $trace = null, $slice = 1) {
         $micro_date = microtime();
         $micro_date = explode(" ", $micro_date);
-        if ($vars) {
 
-            if (is_object($vars)) {
-                $vars = 'Object: '.get_class($vars);
-            }
-            elseif (is_string($vars)) {
-                $size = mb_strlen($vars, '8bit');
-                if ($size > 512) $vars = 'STRING:  '.mb_substr($vars, 0, 500).'...(vars size = ' . $size . 'b)...';
-                elseif (!is_string($vars)) $vars = 'STRING: '.self::_e($vars);
-            }
-            elseif (is_array($vars)) {
-                $vv = 'Array: ['.PHP_EOL;
-                foreach ($vars as $k=>$r) {
-                    $vv .= "\t".(string)$k.' => ';
-                    if (is_array($r)) {
-                        $vv .= 'Array: ['.implode('], [',array_keys($r)).']'.PHP_EOL;
-                    }
-                    elseif(is_object($r)) {
-                        $vv .= 'Object: '.get_class($r).PHP_EOL;
-                    }
-                    else {
-                        $vv .= mb_substr($r, 0, 128).PHP_EOL;
-                    }
-                }
-                $vv .= ']'.PHP_EOL;
-                $vars = $vv;
-//                $size = mb_strlen(json_encode($vars), '8bit');
-//                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
-//                elseif (!is_string($vars)) $vars = 'ARRAY: '.self::_e(var_export($vars, true));
-            }
-            elseif(is_resource($vars)) {
-                $vars = 'RESOURCE: '.get_resource_type($vars);
-            }
-            else {
-                $vars = 'OVER: '.self::_e(var_export($vars, true));
-            }
-        }
         $debug = '<div class="bug_item bug_' . $errno . '">' .
             '<span class="bug_time">' . date('Y-m-d H:i:s P', $micro_date[1]) . '</span>' .
             '<span class="bug_mctime">' . $micro_date[0] . '</span> ' .
             '<span class="bug_type">' . $this->_errorListView[$errno]['type'] . '</span>' .
             '<span class="bug_str">' . self::_e($errstr) . '</span>';
-        if ($vars)
-            $debug .= '<div class="bug_vars">' . $vars . '</div>';
         if ($errfile) {
 //        $debug .= '<div class="bug_file"> File <a href="file:/' . $errfile . ':' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
             $debug .= '<div class="bug_file"> File <a href="idea://open?url=file://' . $errfile . '&line=' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
         }
+        if ($vars) {
+            $debug .= '<div class="bug_vars xsp"><div class="xsp-head" onclick="bugSp(this)">Vars</div><div class="xsp-body">' . self::renderVars($vars) . '</div></div>';
+        }
+
         if ($this->_errorListView[$errno]['debug'] && empty($GLOBALS['skipRenderBackTrace'])) { // для нотисов подробности ни к чему
             $debug .= static::renderBackTrace($slice, $trace);
         } else {
@@ -855,6 +799,46 @@ class PHPErrorCatcher
         return $debug;
     }
 
+    public static function renderVars($vars) {
+
+        if (is_object($vars)) {
+            $vars = 'Object: ' . get_class($vars);
+        } elseif (is_string($vars)) {
+            $size = mb_strlen($vars, '8bit');
+            if ($size > 512) $vars = 'STRING:  ' . mb_substr($vars, 0, 500) . '...(vars size = ' . $size . 'b)...';
+            elseif (!is_string($vars)) $vars = 'STRING: ' . self::_e($vars);
+        } elseif (is_array($vars)) {
+            $vv = 'Array: [' . PHP_EOL;
+            foreach ($vars as $k => $r) {
+                $vv .= "\t" . (string)$k . ' => ';
+                if (is_array($r)) {
+                    $vv .= self::renderVars($r).PHP_EOL;
+                } elseif (is_object($r)) {
+                    $vv .= 'Object: ' . get_class($r) . PHP_EOL;
+                } elseif (is_string($r)) {
+                    $vv .= mb_substr($r, 0, 128) . PHP_EOL;
+                } elseif (is_resource($r)) {
+                    $vv .= 'Resource: ' . get_resource_type($r) . PHP_EOL;
+                } else {
+                    $vv .= 'Over: ' . $r . PHP_EOL;
+                }
+            }
+            $vv .= ']' . PHP_EOL;
+            $vars = $vv;
+//                $size = mb_strlen(json_encode($vars), '8bit');
+//                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
+//                elseif (!is_string($vars)) $vars = 'ARRAY: '.self::_e(var_export($vars, true));
+        } elseif (is_resource($vars)) {
+            $vars = 'RESOURCE: ' . get_resource_type($vars);
+        } elseif (null === $vars)
+            $vars = 'NULL';
+        else {
+            $vars = 'OVER: ' . self::_e(var_export($vars, true));
+        }
+
+        return $vars;
+    }
+
 
     /**
      * Функция трасировки ошибок
@@ -862,10 +846,9 @@ class PHPErrorCatcher
      * @param array $traceArr
      * @return string
      */
-    public static function renderBackTrace($slice = 1, $traceArr = null)
-    {
+    public static function renderBackTrace($slice = 1, $traceArr = null) {
         $MAXSTRLEN = 1024;
-        $s = '<div class="xdebug">';
+        $s = '<div class="xdebug xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body">';
         if (!$traceArr || !is_array($traceArr)) {
             $traceArr = debug_backtrace();
             if ($slice > 0) {
@@ -905,7 +888,7 @@ class PHPErrorCatcher
             $s .= '</div>';
             $i++;
         }
-        $s .= '</div>';
+        $s .= '</div></div>';
         return $s;
     }
 
@@ -914,28 +897,37 @@ class PHPErrorCatcher
     /******************************************************************************************/
     /******************************************************************************************/
 
-    public function setViewAlert($mess)
-    {
+    public function setViewAlert($mess) {
         $this->_viewAlert[] = $mess;
     }
 
-    public function renderToolbar()
-    {
+    public function renderToolbar() {
         if (!$this->_isViewMode && $this->debugMode) {
-            echo '<div class="x-debug-toolbar"><style>
-.x-debug-toolbar {position: fixed; z-index:9999; top: 5px; left: 5px; max-width: 300px;}
-</style>';
-            echo '<p class="alert alert-info"><a href="?' . $this->viewKey . '=/">View Logs</a></p>';
-            if ($this->_profilerStatus && static::init()->_profilerId) {
-                echo '<p class="alert alert-info"><a href="' . self::getProfilerUrl() . '">Profiler ' . $this->_profilerId . '</a></p>';
-            }
-            if ($this->_hasError) {
-                echo '<p class="alert alert-danger"><a href="?' . $this->viewKey . '=/">Error ' . static::getErrCount() . '</a></p>';
-            }
-            foreach ($this->_viewAlert as $r) {
-                echo '<p class="alert alert-warning">' . $r . '</p>';
-            }
-            echo '</div>';
+            if (empty($this->_viewAlert) && !$this->_hasError && (!$this->_profilerStatus || !static::init()->_profilerId))
+                return;
+            echo PHPErrorViewer::renderViewScript($this);
+            ?>
+            <div class="pecToolbar xsp">
+                <button class="btn <?= ($this->_hasError ? 'btn-danger' : 'btn-primary') ?> xsp-head" onclick="bugSp(this)">Expand
+                    Logs: <?= static::getErrCount() ?></button>
+                <a class="btn btn-default" href="?<?= $this->viewKey ?>=/">View All Logs</a>
+                <div class="xsp-body">
+                    <? if ($this->_profilerStatus && static::init()->_profilerId): ?>
+                        <p class="alert-info"><a href="<?= self::getProfilerUrl() ?>">Profiler <?= $this->_profilerId ?></a></p>
+                    <? endif; ?>
+                    <? if ($this->_hasError): ?>
+                        <div class="alert-danger"><?= $this->_allLogs ?></div>
+                    <? endif; ?>
+                    <? if (count($this->_viewAlert)): ?>
+                        <div class="alert-warning">
+                            <? foreach ($this->_viewAlert as $r): ?>
+                                <p><?= $r ?></p>
+                            <? endforeach; ?>
+                        </div>
+                    <? endif; ?>
+                </div>
+            </div>
+            <?php
         }
     }
 
@@ -943,8 +935,7 @@ class PHPErrorCatcher
     /***************************************/
     /***************************************/
 
-    public static function getErrCount()
-    {
+    public static function getErrCount() {
         return static::$_obj->_errCount;
     }
 
@@ -952,18 +943,15 @@ class PHPErrorCatcher
      * Получить все текущие логи и ошибки скрипта
      * @return string
      */
-    public static function getAllLogs()
-    {
+    public static function getAllLogs() {
         return static::$_obj->_allLogs;
     }
 
-    public static function setAllLogs($log)
-    {
+    public static function setAllLogs($log) {
         return static::$_obj->_allLogs = $log;
     }
 
-    public static function clearAllLogs()
-    {
+    public static function clearAllLogs() {
         return static::$_obj->_allLogs = '';
     }
 
@@ -971,8 +959,7 @@ class PHPErrorCatcher
      * Получить ссылку на профалер текщего скрипта
      * @return null
      */
-    public static function getProfilerUrl()
-    {
+    public static function getProfilerUrl() {
         return static::$_obj->_profilerUrl;
     }
 
@@ -981,8 +968,7 @@ class PHPErrorCatcher
      * @param $value string
      * @return string
      */
-    public static function _e($value)
-    {
+    public static function _e($value) {
         return htmlspecialchars((string)$value, ENT_NOQUOTES | ENT_IGNORE, 'utf-8');
     }
 
@@ -992,14 +978,12 @@ class PHPErrorCatcher
      * Профилирование алгоритмов и функций отдельно
      * @param null $timeOut
      */
-    public static function funcStart($timeOut = null)
-    {
+    public static function funcStart($timeOut = null) {
         static::$_functionStartTime = microtime(true);
         static::$_functionTimeOut = $timeOut;
     }
 
-    public static function funcEnd($name, $info = null, $simple = true)
-    {
+    public static function funcEnd($name, $info = null, $simple = true) {
         if (!self::init()->getPdo()) return null;
         static::init()->_time_start = (microtime(true) - static::$_functionStartTime) * 1000;
         if (static::$_functionTimeOut && static::init()->_time_start < static::$_functionTimeOut) {

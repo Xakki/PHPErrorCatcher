@@ -10,15 +10,14 @@ class PHPErrorViewer
      */
     private $owner;
 
-    public function __construct($owner)
-    {
+    public function __construct($owner) {
         $this->owner = $owner;
     }
+
     /**
      * Просмотр логов
      */
-    public function renderView()
-    {
+    public function renderView() {
         ini_set("memory_limit", "128M");
         $url = str_replace(array('\\', '\/\/', '\.\/', '\.\.'), '', $_GET[$this->owner->get('viewKey')]);
 
@@ -28,25 +27,26 @@ class PHPErrorViewer
             'PROF' => '',
             'PHPINFO' => '',
         );
-        
+
         if (!empty($_GET['download'])) {
             header('Content-Type: application/octet-stream');
         } else {
             header('Content-type: text/html; charset=UTF-8');
         }
 
-        if (!isset($_GET['only'])) {
-            echo '<html>'.$this->renderViewHead($file) . '<body>';
+        if (!isset($_GET['only']) && empty($_GET['backup'])) {
+            echo '<html>';
+            echo $this->renderViewHead($file);
+            echo '<body>';
 
             echo '<ul class="nav nav-tabs">' .
-                '<li' . (!isset($tabs[$file]) ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=/">Логи</a></li>' .
-                ($this->owner->getPdo() ? '<li' . ($file == 'BD' ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=BD">BD</a></li>' : '') .
-                ($this->owner->get('_profilerStatus') ? '<li' . ($file == 'PROF' ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=PROF&source=' . $this->owner->get('profiler_namespace'). '&run=">Профаилер</a></li>' : '') .
-                '<li' . ($file == 'PHPINFO' ? ' class="active"' : '') . '><a href="?' . $this->owner->get('viewKey') . '=PHPINFO">PHPINFO</a></li>' .
-                '<li><a href="?" target="_blank">HOME</a></li>' .
+                '<li class="nav-item"><a class="nav-link' . (!isset($tabs[$file]) ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=/">Логи</a></li>' .
+                ($this->owner->getPdo() ? '<li class="nav-item"><a class="nav-link' . ($file == 'BD' ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=BD">BD</a></li>' : '') .
+                ($this->owner->get('_profilerStatus') ? '<li class="nav-item"><a class="nav-link' . ($file == 'PROF' ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=PROF&source=' . $this->owner->get('profiler_namespace') . '&run=">Профаилер</a></li>' : '') .
+                '<li class="nav-item"><a class="nav-link' . ($file == 'PHPINFO' ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=PHPINFO">PHPINFO</a></li>' .
+                '<li class="nav-item"><a class="nav-link" href="?" target="_blank">HOME</a></li>' .
                 '</ul>';
         }
-
 
 
         if ($file == 'BD') {
@@ -105,83 +105,169 @@ class PHPErrorViewer
      * @param $file
      * @return string
      */
-    public function renderViewHead($file)
-    {
-        $html = '<head>
-                <title>LogView' . ($file ? ':' . $file : '') . '</title>
-                <meta http-equiv="Cache-Control" content="no-cache">
-                <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-                <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
-                <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
-                <script src="https://yastatic.net/jquery/2.1.4/jquery.min.js"></script>
-                <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-                <script>
-                    selectText = function(e) {
-                        var r,s;
-                        if(window.getSelection){
-                            s=window.getSelection();
-                            if(s.setBaseAndExtent){
-                                s.setBaseAndExtent(e,0,e,e.innerText.length-1);
-                            } else{
-                                r=document.createRange();
-                                r.selectNodeContents(e);
-                                s.removeAllRanges();
-                                s.addRange(r);
-                            }
-                        } else if(document.getSelection){
-                            s=document.getSelection();
-                            r=document.createRange();
+    public function renderViewHead($file) {
+        ?>
+        <head>
+            <title>LogView<?= ($file ? ':' . $file : '') ?></title>
+            <meta http-equiv="Cache-Control" content="no-cache">
+            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+                  integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+            <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+                    crossorigin="anonymous"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+                    integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+            <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+                    integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+            <script>
+                selectText = function (e) {
+                    var r, s;
+                    if (window.getSelection) {
+                        s = window.getSelection();
+                        if (s.setBaseAndExtent) {
+                            s.setBaseAndExtent(e, 0, e, e.innerText.length - 1);
+                        } else {
+                            r = document.createRange();
                             r.selectNodeContents(e);
                             s.removeAllRanges();
                             s.addRange(r);
-                        } else if(document.selection){
-                            r=document.body.createTextRange();
-                            r.moveToElementText(e);
-                            r.select();
                         }
+                    } else if (document.getSelection) {
+                        s = document.getSelection();
+                        r = document.createRange();
+                        r.selectNodeContents(e);
+                        s.removeAllRanges();
+                        s.addRange(r);
+                    } else if (document.selection) {
+                        r = document.body.createTextRange();
+                        r.moveToElementText(e);
+                        r.select();
                     }
+                }
 
-                    $(document).ready(function() {
-                        $(\'.linkDel\').on(\'click\', function() {
-                            if (confirm(\'Удалить?\'))
-                                return true;
-                             return false;
-                        });
-                        $(\'.xdebug-item-file a, .bug_file a\').on(\'click\', function() {
-                            selectText(this);
-                            return false;
-                        });
+                $(document).ready(function () {
+                    $('.linkDel').on('click', function () {
+                        if (confirm('Удалить?'))
+                            return true;
+                        return false;
                     });
-                </script>
-                <style>
-                .bugs_host {padding:0 10px 0 0;}
-                .bugs_uri {padding:0 10px 0 0;}
-                .bugs_ip {padding:0 10px 0 0;}
-                .bugs_ref {padding:0 10px 0 0;}
-                .bugs_prof {}
-                .bugs_prof.alert {color:red;}
-                .bugs { border-top:3px gray solid; margin-top: 10px; padding-top: 5px;}
-                .bug_item .xdebug {
-                    background-color: #e1e1e1; margin: 5px 0;
-                }
-                .bug_item .xdebug-item {
-                    border-top: solid 1px #a1a1a1;
-                }
-                .bug_mctime {
-                    font-style: italic; font-size: 0.8em; margin: 0 3px;
-                }
-                .bug_type {
-                    margin: 0 3px;
-                }
-                .bug_vars {
-                    margin: 0 3px; white-space: pre;
-                }
-                ';
-        foreach ($this->owner->get('_errorListView') as $errno => $error) {
-            $html .= '.bug_' . $errno . ' .bug_type {color:' . $error['color'] . ';}';
-        }
-        $html .= '</style></head>';
-        return $html;
+                    $('.xdebug-item-file a, .bug_file a').on('click', function () {
+                        selectText(this);
+                        return false;
+                    });
+                });
+            </script>
+            <?= $this->renderViewScript($this->owner) ?>
+        </head>
+        <?php
+    }
+
+    public static function renderViewScript($owner) {
+        ?>
+        <style>
+
+            .xsp.unfolded > .xsp-head::before {
+                content: " - ";
+            }
+
+            .xsp > .xsp-head::before {
+                content: " + ";
+            }
+
+            .xsp > .xsp-body {
+                display: none;
+            }
+
+            .xsp.unfolded > .xsp-body {
+                display: block;
+            }
+
+            .xsp > .xsp-head {
+                color: #797979;
+                cursor: pointer;
+            }
+
+            .xsp > .xsp-head:hover {
+                color: black;
+            }
+
+            .pecToolbar {
+                position: fixed;
+                z-index: 9999;
+                top: 10px;
+                right: 10px;
+                min-width: 300px;
+                max-width: 40%;
+                padding: 10px;
+                background: gray;
+                text-align: right;
+            }
+
+            .pecToolbar > .xsp-body {
+                margin-top: 10px;
+                text-align: left;
+            }
+
+            .xdebug > .xsp-body {
+                padding: 0;
+                padding: 0 0 0 1em;
+                border-bottom: 1px dashed #C3CBD1;
+                color: black;
+                font-size: 10px;
+            }
+
+            .bugs {
+                border-top: 3px gray solid;
+                margin-top: 10px;
+                padding-top: 5px;
+            }
+
+            .bug_item {
+                padding: 10px 5px;
+            }
+
+            .bug_item span {
+                padding: 0 5px 0 0;
+            }
+
+            .bug_time {
+            }
+
+            .bug_mctime {
+                font-style: italic;
+                font-size: 0.8em;
+                margin: 0 3px;
+            }
+
+            .bug_type {
+                font-weight: bold;
+            }
+
+            .bug_str {
+            }
+
+            .bug_vars .xsp-body {
+                white-space: pre-wrap;
+            }
+
+            .bug_file {
+            }
+
+            <?php  foreach ($owner->get('_errorListView') as $errno => $error): ?>
+            .bug_<?=$errno?> .bug_type {
+                color: <?=$error['color']?>;
+            }
+
+            ';
+            <?php endforeach; ?>
+        </style>
+        <script>
+            function bugSp(obj) {
+                var obj = obj.parentNode;
+                if (obj.className.indexOf('unfolded') >= 0) obj.className = obj.className.replace('unfolded', ''); else obj.className = obj.className + ' unfolded';
+            }
+        </script>
+        <?php
     }
 
     /**
@@ -189,8 +275,7 @@ class PHPErrorViewer
      * @param string $path
      * @return array
      */
-    public function viewGetDirList($path = '')
-    {
+    public function viewGetDirList($path = '') {
         $dirList1 = $dirList2 = array();
         $path = trim($path, '/.');
         $fullPath = $this->owner->get('logPath') . ($path ? '/' . $path : '');
@@ -258,8 +343,7 @@ class PHPErrorViewer
      * @param $dirList
      * @return string
      */
-    public function renderViewDirList($dirList)
-    {
+    public function renderViewDirList($dirList) {
         $html = '<table class="table table-striped" style="width: auto;">';
         $html .= '<thead>
             <tr>
@@ -281,8 +365,7 @@ class PHPErrorViewer
      * Делаем бекап фаила и ссылку на него
      * @param $file
      */
-    private function viewCreateBackUp($file)
-    {
+    private function viewCreateBackUp($file) {
 
         if (is_dir($file)) {
             echo 'Is Dir';
@@ -334,8 +417,7 @@ class PHPErrorViewer
      * Бекапи логи
      * @param $dir
      */
-    private function viewCreateBackUpDir($dir)
-    {
+    private function viewCreateBackUpDir($dir) {
         if (!is_dir($dir)) {
             echo 'Is not Dir';
         }
@@ -363,8 +445,7 @@ class PHPErrorViewer
      * @param $url
      * @return string
      */
-    private function renderViewBreadCrumb($url)
-    {
+    private function renderViewBreadCrumb($url) {
         $temp = preg_split('/\//', $url, -1, PREG_SPLIT_NO_EMPTY);
         $ctr = '';
         $url = $_SERVER['REQUEST_URI'];
@@ -372,9 +453,9 @@ class PHPErrorViewer
         $basePath = $fullPath = rtrim($url['path'], '/') . '/?' . $this->owner->get('viewKey') . '=/';
         foreach ($temp as $r) {
             $fullPath .= '/' . $r;
-            $ctr .= '<li><a href="' . $fullPath . '">' . $r . '</a>';
+            $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . $r . '</a>';
         }
-        return '<ul class="breadcrumb"><li><a href="' . $basePath . '">Home</a>' . $ctr . '</ul>';
+        return '<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="' . $basePath . '">Home</a>' . $ctr . '</ol></nav>';
     }
 
 
@@ -382,8 +463,7 @@ class PHPErrorViewer
      * Печатаем то что выдает профаилер
      * @return mixed|string
      */
-    public function viewRenderPROF()
-    {
+    public function viewRenderPROF() {
         $allowInc = array(
             'callgraph' => 1,
             'typeahead' => 1,
@@ -437,8 +517,7 @@ class PHPErrorViewer
     /*********************************/
 
 
-    public function viewRenderBD($flag = false)
-    {
+    public function viewRenderBD($flag = false) {
         $fields = array(
             'id' => array('ID', 'filter' => 1, 'sort' => 1),
             'host' => array('Host', 'filter' => 1, 'sort' => 1),
@@ -674,8 +753,7 @@ class PHPErrorViewer
     /******************************************************************************************/
 
 
-    private function createDB()
-    {
+    private function createDB() {
         $sql = 'CREATE TABLE `' . $this->owner->get('pdoTableName') . '` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
@@ -697,8 +775,7 @@ class PHPErrorViewer
     }
 
 
-    private function checkIsBackUp($file)
-    {
+    private function checkIsBackUp($file) {
         return (strpos($file, $this->owner->get('logPath') . $this->owner->get('backUpDir')) !== false);
     }
 
@@ -708,8 +785,7 @@ class PHPErrorViewer
      * @param $dir
      * @return bool
      */
-    public static function delTree($dir)
-    {
+    public static function delTree($dir) {
         $files = array_diff(scandir($dir), array('.', '..'));
         foreach ($files as $file) {
             (is_dir("$dir/$file")) ? static::delTree("$dir/$file") : unlink("$dir/$file");
@@ -717,8 +793,7 @@ class PHPErrorViewer
         return rmdir($dir);
     }
 
-    public static function getFileContent($file)
-    {
+    public static function getFileContent($file) {
         // if ()
         // mime_content_type
         $pathinfo = pathinfo($file);
