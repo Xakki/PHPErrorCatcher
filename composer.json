@@ -1,9 +1,9 @@
 {
   "name": "xakki/phperrorcatcher",
-  "version": "0.2.3",
+  "version": "0.3.4",
   "description": "Logger all error in file for PHP",
   "type": "library",
-  "minimum-stability": "stable",
+  "minimum-stability": "dev",
   "license": "LGPL-2.1",
   "authors": [
     {
