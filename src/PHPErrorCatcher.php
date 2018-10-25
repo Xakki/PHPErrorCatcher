@@ -812,7 +812,7 @@ class PHPErrorCatcher
             foreach ($vars as $k => $r) {
                 $vv .= "\t" . (string)$k . ' => ';
                 if (is_array($r)) {
-                    $vv .= self::renderVars($r).PHP_EOL;
+                    $vv .= self::renderVars($r) . PHP_EOL;
                 } elseif (is_object($r)) {
                     $vv .= 'Object: ' . get_class($r) . PHP_EOL;
                 } elseif (is_string($r)) {
