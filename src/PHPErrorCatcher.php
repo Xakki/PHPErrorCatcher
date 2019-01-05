@@ -322,7 +322,11 @@ class PHPErrorCatcher
      * Use catche.js for log error in javascript
      */
     public function initLogRequest() {
-        if (isset($_GET[$this->catcherLogName]) && count($_POST) > 2) {
+        if (isset($_GET[$this->catcherLogName])) {
+            if (!count($_POST)) {
+                $_POST = json_decode(file_get_contents('php://input'), true);
+            }
+            if (!isset($_POST['m']) || !isset($_POST['u']) || !isset($_POST['r'])) exit();
             $errstr = $_POST['m'];
             $size = mb_strlen(serialize((array)$errstr), '8bit');
             if ($size > 1500) $errstr = mb_substr($errstr, 0, 1000) . '...(' . $size . 'b)...';
@@ -497,9 +501,6 @@ class PHPErrorCatcher
             $GLOBALS['skipRenderBackTrace'] = 1;
         }
         $errno = E_USER_WARNING;
-
-        if ($data)
-            $data .= '<pre>' . self::renderVars($data) . '</pre>';
         self::init()->handleError($errno, $mess, $errfile, $errline, $data, array_slice($traceArr, $slice));
     }
 
@@ -741,12 +742,12 @@ class PHPErrorCatcher
                 $this->_postData = array_slice($this->_postData, 0, 10);
             }
             $this->_postData = array_map(function ($val) {
-                if (mb_strlen($val) > 64) return mb_substr($val, 0, 64) . '...';
-                elseif (is_array($val)) {
+                if (is_array($val)) {
                     $cnt1 = count($val);
                     if ($cnt1 > 10) $val = array_slice($val, 0, 10);
                     return ' [<' . implode(', ', array_keys($val)) . '> ' . ($cnt1 > count($val) ? '...' . $cnt1 : '') . '] ';
                 }
+                elseif (mb_strlen($val) > 64) return mb_substr($val, 0, 64) . '...';
                 return $val;
             }, $this->_postData);
             $res .= PHP_EOL . '<span class="bugs_post">' . self::_e(json_encode($this->_postData, JSON_UNESCAPED_UNICODE)) .
@@ -785,7 +786,12 @@ class PHPErrorCatcher
             $debug .= '<div class="bug_file"> File <a href="idea://open?url=file://' . $errfile . '&line=' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
         }
         if ($vars) {
-            $debug .= '<div class="bug_vars xsp"><div class="xsp-head" onclick="bugSp(this)">Vars</div><div class="xsp-body">' . self::renderVars($vars) . '</div></div>';
+            $vars = self::renderVars($vars);
+            if (mb_strlen($vars) > 512) {
+                $debug .= '<div class="bug_vars xsp"><div class="xsp-head" onclick="bugSp(this)">Vars</div><div class="xsp-body">' . $vars . '</div></div>';
+            } else {
+                $debug .= '<div class="bug_vars small">' . $vars . '</div>';
+            }
         }
 
         if ($this->_errorListView[$errno]['debug'] && empty($GLOBALS['skipRenderBackTrace'])) { // для нотисов подробности ни к чему
@@ -799,20 +805,22 @@ class PHPErrorCatcher
         return $debug;
     }
 
-    public static function renderVars($vars) {
-
+    public static function renderVars($vars, $sl = 0) {
+        $slr = str_repeat("\t", $sl);
         if (is_object($vars)) {
             $vars = 'Object: ' . get_class($vars);
+
         } elseif (is_string($vars)) {
             $size = mb_strlen($vars, '8bit');
-            if ($size > 512) $vars = 'STRING:  ' . mb_substr($vars, 0, 500) . '...(vars size = ' . $size . 'b)...';
-            elseif (!is_string($vars)) $vars = 'STRING: ' . self::_e($vars);
+            if ($size > 512) $vars = '"' . mb_substr(self::_e($vars), 0, 512) . '...(' . $size . 'b)"';
+            else $vars = '"' . self::_e($vars).'"';
+
         } elseif (is_array($vars)) {
-            $vv = 'Array: [' . PHP_EOL;
+            $vv = '[' . PHP_EOL;
             foreach ($vars as $k => $r) {
-                $vv .= "\t" . (string)$k . ' => ';
+                $vv .= $slr."\t" . (string)$k . ' => ';
                 if (is_array($r)) {
-                    $vv .= self::renderVars($r) . PHP_EOL;
+                    $vv .= self::renderVars($r, ($sl+1)).PHP_EOL;
                 } elseif (is_object($r)) {
                     $vv .= 'Object: ' . get_class($r) . PHP_EOL;
                 } elseif (is_string($r)) {
@@ -820,23 +828,26 @@ class PHPErrorCatcher
                 } elseif (is_resource($r)) {
                     $vv .= 'Resource: ' . get_resource_type($r) . PHP_EOL;
                 } else {
-                    $vv .= 'Over: ' . $r . PHP_EOL;
+                    $vv .= 'Over: "' . $r .'"'. PHP_EOL;
                 }
             }
-            $vv .= ']' . PHP_EOL;
+            $vv .= $slr.']';
             $vars = $vv;
 //                $size = mb_strlen(json_encode($vars), '8bit');
 //                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
 //                elseif (!is_string($vars)) $vars = 'ARRAY: '.self::_e(var_export($vars, true));
+
         } elseif (is_resource($vars)) {
             $vars = 'RESOURCE: ' . get_resource_type($vars);
+
         } elseif (null === $vars)
             $vars = 'NULL';
+
         else {
-            $vars = 'OVER: ' . self::_e(var_export($vars, true));
+            $vars = 'OVER: "' . self::_e(var_export($vars, true)).'"';
         }
 
-        return $vars;
+        return $slr.$vars;
     }
 
 
