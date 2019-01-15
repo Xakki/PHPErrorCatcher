@@ -510,7 +510,7 @@ class PHPErrorCatcher
      * @param string $mess
      */
     public function handleException($e, $mess = '') {
-        $this->handleError(E_EXCEPTION_ERROR, $e->getMessage() . ($mess ? '<br/>' . $mess : ''), $e->getFile(), $e->getLine(), $e->getCode(), $e->getTrace(), 2);
+        $this->handleError(E_EXCEPTION_ERROR, $e->getMessage() . ($mess ? PHP_EOL . $mess : ''), $e->getFile(), $e->getLine(), $e->getCode(), $e->getTrace(), 2);
     }
 
     public static function logException($e, $mess = '') {
