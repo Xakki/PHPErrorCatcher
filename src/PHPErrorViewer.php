@@ -38,12 +38,14 @@ class PHPErrorViewer
             echo '<html>';
             echo $this->renderViewHead($file);
             echo '<body>';
+            $home = $this->owner->getHomeUrl('');
+
 
             echo '<ul class="nav nav-tabs">' .
-                '<li class="nav-item"><a class="nav-link' . (!isset($tabs[$file]) ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=/">Логи</a></li>' .
-                ($this->owner->getPdo() ? '<li class="nav-item"><a class="nav-link' . ($file == 'BD' ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=BD">BD</a></li>' : '') .
-                ($this->owner->get('_profilerStatus') ? '<li class="nav-item"><a class="nav-link' . ($file == 'PROF' ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=PROF&source=' . $this->owner->get('profiler_namespace') . '&run=">Профаилер</a></li>' : '') .
-                '<li class="nav-item"><a class="nav-link' . ($file == 'PHPINFO' ? ' active' : '') . '" href="?' . $this->owner->get('viewKey') . '=PHPINFO">PHPINFO</a></li>' .
+                '<li class="nav-item"><a class="nav-link' . (!isset($tabs[$file]) ? ' active' : '') . '" href="' . $home . '/">Логи</a></li>' .
+                ($this->owner->getPdo() ? '<li class="nav-item"><a class="nav-link' . ($file == 'BD' ? ' active' : '') . '" href="' . $home . 'BD">BD</a></li>' : '') .
+                ($this->owner->get('_profilerStatus') ? '<li class="nav-item"><a class="nav-link' . ($file == 'PROF' ? ' active' : '') . '" href="' . $home . 'PROF&source=' . $this->owner->get('profiler_namespace') . '&run=">Профаилер</a></li>' : '') .
+                '<li class="nav-item"><a class="nav-link' . ($file == 'PHPINFO' ? ' active' : '') . '" href="' . $home . 'PHPINFO">PHPINFO</a></li>' .
                 '<li class="nav-item"><a class="nav-link" href="?" target="_blank">HOME</a></li>' .
                 '</ul>';
         }
@@ -165,7 +167,6 @@ class PHPErrorViewer
     public static function renderViewScript($owner) {
         ?>
         <style>
-
             .xsp.unfolded > .xsp-head::before {
                 content: " - ";
             }
@@ -243,6 +244,10 @@ class PHPErrorViewer
                 font-weight: bold;
             }
 
+            .bugs_post {
+                white-space: pre;
+                dispaly:block;
+            }
             .bug_str {
             }
 
@@ -257,8 +262,6 @@ class PHPErrorViewer
             .bug_<?=$errno?> .bug_type {
                 color: <?=$error['color']?>;
             }
-
-            ';
             <?php endforeach; ?>
         </style>
         <script>
@@ -287,12 +290,11 @@ class PHPErrorViewer
         }
         $isBackUpDir = $this->checkIsBackUp($fullPath);
         $dir = dir($fullPath);
-        $url = $_SERVER['REQUEST_URI'];
-        $url = parse_url($url);
-        $pathUrl = rtrim($url['path'], '/');
+        $homeUrl = $this->owner->getHomeUrl();
+
         while (false !== ($entry = $dir->read())) {
             if ($entry != '.' && $entry != '..') {
-                $fileUrl = $pathUrl . '/?' . $this->owner->get('viewKey') . '=' . $path . '/' . $entry;
+                $fileUrl = $homeUrl . $path . '/' . $entry;
                 $filePath = $fullPath . '/' . $entry;
 
 
@@ -393,7 +395,7 @@ class PHPErrorViewer
 
             if (copy($file, $backUpFile)) {
                 $loc = str_replace(array('&backup=do', '&backup=del'), '', $_SERVER['REQUEST_URI']);
-                $backUpFileUrl = str_replace($_GET[$this->owner->get('viewKey')], str_replace($this->owner->get('logPath'), '', $backUpFile), $loc);
+                $backUpFileUrl = $this->owner->getFileUrl($backUpFile);
 
                 // add info
                 file_put_contents($backUpFile, '<a href="' . $loc . '">This backup file in ' . date('Y-m-d H:i:s') . ' from origin</a><hr/>' . PHP_EOL . file_get_contents($backUpFile));
@@ -450,9 +452,9 @@ class PHPErrorViewer
         $ctr = '';
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
-        $basePath = $fullPath = rtrim($url['path'], '/') . '/?' . $this->owner->get('viewKey') . '=/';
+        $basePath = $fullPath = $this->owner->getHomeUrl('');
         foreach ($temp as $r) {
-            $fullPath .= '/' . $r;
+            $fullPath .= '/'.$r;
             $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . $r . '</a>';
         }
         return '<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="' . $basePath . '">Home</a>' . $ctr . '</ol></nav>';
@@ -494,6 +496,7 @@ class PHPErrorViewer
         if ($_GET['viewInc'] == 'callgraph') {
             exit($html);
         } else {
+            $home = $this->owner->getHomeUrl('PROF');
             $html = str_replace(array(
                 'link href=\'/',
                 'script src=\'/',
@@ -502,12 +505,12 @@ class PHPErrorViewer
                 'a href="/callgraph.php?',
                 'a href="/typeahead.php?'
             ), array(
-                'link href=\'?' . $this->owner->get('viewKey') . '=PROF&only=1&viewSrc=',
-                'script src=\'?' . $this->owner->get('viewKey') . '=PROF&only=1&viewSrc=',
-                'a href="?' . $this->owner->get('viewKey') . '=PROF&',
-                'a href="?' . $this->owner->get('viewKey') . '=PROF&',
-                'a href="?' . $this->owner->get('viewKey') . '=PROF&only=1&viewInc=callgraph&',
-                'a href="?' . $this->owner->get('viewKey') . '=PROF&&viewInc=typeahead&'
+                'link href=\'?' . $home . '&only=1&viewSrc=',
+                'script src=\'?' . $home . '&only=1&viewSrc=',
+                'a href="' . $home . '&',
+                'a href="' . $home . '&',
+                'a href="' . $home . '&only=1&viewInc=callgraph&',
+                'a href="' . $home . '&viewInc=typeahead&'
             ), $html);
         }
         ob_end_clean();
