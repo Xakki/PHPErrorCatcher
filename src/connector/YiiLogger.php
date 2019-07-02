@@ -1,6 +1,6 @@
 <?php
 
-namespace xakki\phperrorcatcher\yii2;
+namespace xakki\phperrorcatcher\connector;
 
 use \xakki\phperrorcatcher\PHPErrorCatcher;
 
@@ -11,10 +11,10 @@ use \xakki\phperrorcatcher\PHPErrorCatcher;
  * Catch all logs
  *
  * Add to config
- *    Yii::$container->set('yii\log\Logger', '\xakki\phperrorcatcher\yii2\Logger');
+ *    Yii::$container->set('yii\log\Logger', '\xakki\phperrorcatcher\connector\YiiLogger');
  *    $config['bootstrap'][] = 'log';
  */
-class Logger extends \yii\log\Logger {
+class YiiLogger extends \yii\log\Logger {
     public $targets = [];
     static $toMylevels = [
         self::LEVEL_ERROR => PHPErrorCatcher::LEVEL_ERROR,

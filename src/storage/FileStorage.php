@@ -31,7 +31,7 @@ class FileStorage extends BaseStorage {
 
         if ($this->_owner->needSaveLog()) {
             if($this->putData($this->getSerializeLogs($this->_owner->getDataLogsGenerator()))) {
-                $this->_owner->succeessSaveLog();
+                $this->_owner->successSaveLog();
             }
         }
     }

@@ -21,7 +21,7 @@ defined('E_USER_ALERT') || define('E_USER_ALERT', -3); // custom error
  * Time: 12:00
  */
 class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
-    const VERSION = '0.4.7';
+    const VERSION = '0.4.8';
 
     const LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
@@ -140,9 +140,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @var LogData[]
      */
     protected $_logData = [];
-    protected $_succeessSaveLog = false;
+    protected $_successSaveLog = false;
 
-    protected static $_MEMCACHE = false;
+    /**
+     * @var \Memcached|null
+     */
+    protected static $_MEMCACHE = null;
     protected static $_viewAlert = [];
     protected static $_functionTimeOut = null;
     protected static $_functionStartTime;
@@ -275,15 +278,16 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    public function succeessSaveLog() {
-        $this->_succeessSaveLog = true;
+    public function successSaveLog() {
+        $this->_successSaveLog = true;
     }
 
     /**
      * @return \Memcached|null
      */
     public function memcache($restore = false) {
-        if (!static::$_MEMCACHE) {
+        if (is_null(static::$_MEMCACHE)) {
+            static::$_MEMCACHE = false;
             if (is_object($this->memcacheServers)) {
                 static::$_MEMCACHE = $this->memcacheServers;
             }
@@ -292,7 +296,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
                 foreach($this->memcacheServers as $server) {
                     if (!static::$_MEMCACHE->addServer($server[0], $server[1])) {
                         trigger_error('Memcached is down', E_USER_WARNING);
-                        return false;
+                        return static::$_MEMCACHE;
                     }
                 }
             }
@@ -327,13 +331,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     }
 
     public function needSaveLog() {
-        return (!$this->_succeessSaveLog && count($this->_logData) && (!$this->saveLogIfHasError || $this->_errCount));
+        return (!$this->_successSaveLog && count($this->_logData) && (!$this->saveLogIfHasError || $this->_errCount));
     }
 
     /**
      * Обработчик исключений
      * @param $e \Exception
-     * @param string $mess
      */
     public function handleException($e) {
         $fields = [self::FIELD_LOG_TYPE => self::TYPE_EXCEPTION];
@@ -528,16 +531,16 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     public static function flushCatchLog() {
         // TODO
-        $log = '';//self::init()->getRenderLogs();
-        try {
-            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
-                //$logs .= $this->renderItemLog($logData);
-            }
-        } catch (\Throwable $e) {
-            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
-        }
-        self::$_userCatchLogFlag = false;
-        return $log;
+//        $log = '';//self::init()->getRenderLogs();
+//        try {
+//            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
+//                //$logs .= $this->renderItemLog($logData);
+//            }
+//        } catch (\Throwable $e) {
+//            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
+//        }
+//        self::$_userCatchLogFlag = false;
+//        return $log;
     }
 
     /**

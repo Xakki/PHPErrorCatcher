@@ -14,7 +14,7 @@ class ElasticStorage extends BaseStorage {
         if ($this->_owner->needSaveLog()) {
 //            $this->initLogIndex();
             if ($this->putData($this->_owner->getDataLogsGenerator(), $_SERVER)) {
-                $this->_owner->succeessSaveLog();
+                $this->_owner->successSaveLog();
             }
         }
     }
