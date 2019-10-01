@@ -21,9 +21,6 @@ class YiiLogger extends \yii\log\Logger {
         self::LEVEL_WARNING => PHPErrorCatcher::LEVEL_WARNING,
         self::LEVEL_INFO => PHPErrorCatcher::LEVEL_INFO,
         self::LEVEL_TRACE => PHPErrorCatcher::LEVEL_DEBUG,
-        //        self::LEVEL_PROFILE_BEGIN => E_USER_INFO,
-        //        self::LEVEL_PROFILE_END => E_USER_INFO,
-        //        self::LEVEL_PROFILE => E_USER_ALERT,
     ];
 
     public function log($message, $level, $category = '') {

@@ -16,20 +16,20 @@ class ToolbarPlugin extends BasePlugin {
                     Logs: <?= static::getErrCount() ?></button>
                 <a class="btn btn-default" href="?<?= $this->viewKey ?>=/">View All Logs</a>
                 <div class="xsp-body">
-                    <? if ($this->_profilerStatus && static::init()->_profilerId): ?>
+                    <?php if ($this->_profilerStatus && static::init()->_profilerId): ?>
                         <p class="alert-info"><a
                                     href="<?= self::getProfilerUrl() ?>">Profiler <?= $this->_profilerId ?></a></p>
-                    <? endif; ?>
-                    <? if ($this->_hasError): ?>
+                    <?php endif; ?>
+                    <?php if ($this->_hasError): ?>
                         <div class="alert-danger"><?= $this->_allLogs ?></div>
-                    <? endif; ?>
-                    <? if (count($this->_viewAlert)): ?>
+                    <?php endif; ?>
+                    <?php if (count($this->_viewAlert)): ?>
                         <div class="alert-warning">
-                            <? foreach ($this->_viewAlert as $r): ?>
+                            <?php foreach ($this->_viewAlert as $r): ?>
                                 <p><?= $r ?></p>
-                            <? endforeach; ?>
+                            <?php endforeach; ?>
                         </div>
-                    <? endif; ?>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php

@@ -17,4 +17,6 @@ abstract class BaseViewer extends \xakki\phperrorcatcher\Base {
         $url = parse_url($url);
         return $url['path'] . '?' . $this->getInitGetKey() . '=' . $end;
     }
+
+    abstract public function renderAllLogs($httpData, $logDatas);
 }

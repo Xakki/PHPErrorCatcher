@@ -15,11 +15,6 @@ class FileViewer extends BaseViewer {
      * @var array
      */
     private $_errorListView = [
-        E_UNRECONIZE => [
-            'type' => '[@]',
-            'color' => 'black',
-            'debug' => 0
-        ],
         PHPErrorCatcher::LEVEL_CRITICAL => [
             'type' => '[Critical]',
             'color' => 'red',
@@ -57,10 +52,10 @@ class FileViewer extends BaseViewer {
             'debug' => 0
         ],
     ];
-    
+
     /* @var FileStorage */
     protected $_fileStorage;
-    
+
     function __construct(PHPErrorCatcher $owner, $config = []) {
         parent::__construct($owner, $config);
         if (empty($this->initGetKey)) return;
@@ -117,8 +112,8 @@ class FileViewer extends BaseViewer {
             if (file_exists($this->_owner->getRawLogFile())) {
                 echo '<li class="nav-item"><a class="text-danger nav-link' . ($file=='rawlog' ? ' active' : '') . '" href="' . $home . 'rawlog">Errors</a></li>';
             }
-                //($this->owner->getPdo() ? '<li class="nav-item"><a class="nav-link' . ($file == 'BD' ? ' active' : '') . '" href="' . $home . 'BD">BD</a></li>' : '') . 
-                //($this->owner->get('_profilerStatus') ? '<li class="nav-item"><a class="nav-link' . ($file == 'PROF' ? ' active' : '') . '" href="' . $home . 'PROF&source=' . $this->owner->get('profiler_namespace') . '&run=">Профаилер</a></li>' : '') . 
+            //($this->owner->getPdo() ? '<li class="nav-item"><a class="nav-link' . ($file == 'BD' ? ' active' : '') . '" href="' . $home . 'BD">BD</a></li>' : '') .
+            //($this->owner->get('_profilerStatus') ? '<li class="nav-item"><a class="nav-link' . ($file == 'PROF' ? ' active' : '') . '" href="' . $home . 'PROF&source=' . $this->owner->get('profiler_namespace') . '&run=">Профаилер</a></li>' : '') .
             echo '<li class="nav-item"><a class="nav-link' . ($file == 'PHPINFO' ? ' active' : '') . '" href="' . $home . 'PHPINFO">PHPINFO</a></li>';
             echo '<li class="nav-item"><a class="nav-link" href="?" target="_blank">HOME</a></li>';
             echo '<li class="nav-item"><a class="nav-link">Core ver: '.PHPErrorCatcher::VERSION.'; Viewer ver: '.self::VERSION.'</a></li>';
@@ -128,10 +123,10 @@ class FileViewer extends BaseViewer {
 
 //        if ($file == 'BD') {
 //            echo $this->viewRenderBD();
-//        } 
+//        }
 //        elseif ($file == 'PROF') {
 //            echo $this->viewRenderPROF();
-//        } 
+//        }
 //        else
         if ($file == 'rawlog') {
             if (file_exists($this->_owner->getRawLogFile())) {
@@ -148,7 +143,7 @@ class FileViewer extends BaseViewer {
         }
         elseif ($file == 'PHPINFO') {
             phpinfo();
-        } 
+        }
         else {
             $file = $this->_fileStorage->getLogPath() . '/' . $file;
 
@@ -492,7 +487,7 @@ class FileViewer extends BaseViewer {
         if (defined('ERROR_NO_BACKUP')) {
             unlink($file);
             header('Location: ' . $this->getPreviosUrl());
-        } 
+        }
         else {
             $backUpFile = str_replace($this->_fileStorage->getLogPath(), $this->_fileStorage->getLogPath() . $this->_fileStorage->getBackUpDir(), $file);
             $backUpFileDir = dirname($backUpFile);
@@ -636,8 +631,8 @@ class FileViewer extends BaseViewer {
         $realFilePath = str_replace($this->_fileStorage->getLogPath(), '', $realFilePath);
         return $this->getHomeUrl() . ltrim($realFilePath, '/');
     }
-    
-    
+
+
     /*******************************************************/
     /*******************************************************/
     /*******************************************************/
@@ -671,7 +666,7 @@ class FileViewer extends BaseViewer {
      * @param LogData[] $logDatas
      * @return string
      */
-    private function renderAllLogs($httpData, $logDatas) {
+    public function renderAllLogs($httpData, $logDatas) {
 //        $this->_owner->setSafeParams();
 //        $profilerUrlTag = '';
 //        if ($this->_profilerUrl) {
@@ -717,7 +712,7 @@ class FileViewer extends BaseViewer {
      */
     public static function renderItemLog($logData) {
         $res = '<div class="bug_item bug_level_' . $logData->level . '">'
-            . '<span class="bug_time">' . $logData->timestamp . '</span>'
+            . '<span class="bug_time">' . date('H:i:s', $logData->timestamp) . '</span>'
             . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '['.$logData->count.']' : '') . '</span>';
         //(isset($logData->fields[PHPErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PHPErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
         if ($logData->tags) {

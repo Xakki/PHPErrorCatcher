@@ -48,7 +48,7 @@ class JsLogPlugin extends BasePlugin {
         if (!empty($_POST['l'])) $vars['line'] = $_POST['l'];
 
         $GLOBALS['skipRenderBackTrace'] = 1;
-        $owner->log($errstr, ['js', $this->catcherLogName], $vars, PHPErrorCatcher::LEVEL_WARNING);
+        $owner->log(PHPErrorCatcher::LEVEL_WARNING, $errstr, ['js', $this->catcherLogName], $vars);
 
     }
 

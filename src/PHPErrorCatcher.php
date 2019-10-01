@@ -2,26 +2,11 @@
 
 namespace xakki\phperrorcatcher;
 
-// Дописываем параметры для консольного запуска скрипта
-if (!isset($_SERVER['HTTP_HOST'])) $_SERVER['HTTP_HOST'] = 'cli';
-if (!isset($_SERVER['REQUEST_URI'])) $_SERVER['REQUEST_URI'] = '';
-if (!isset($_SERVER['REMOTE_ADDR'])) $_SERVER['REMOTE_ADDR'] = '';
-
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-defined('E_EXCEPTION_ERROR') || define('E_EXCEPTION_ERROR', -1); // custom error
-defined('E_UNRECONIZE') || define('E_UNRECONIZE', 0); // custom error
-defined('E_USER_INFO') || define('E_USER_INFO', -2); // custom error
-defined('E_USER_ALERT') || define('E_USER_ALERT', -3); // custom error
-
-/**
- * User: xakki
- * Date: 18.08.16
- * Time: 12:00
- */
 class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
-    const VERSION = '0.4.8';
+    const VERSION = '0.4.10';
 
     const LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
@@ -39,7 +24,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     const FIELD_LOG_TYPE = 'log_type',
         FIELD_FILE = 'file',
         FIELD_TRICE = 'trice',
-        FIELD_NO_TRICE = 'no-trice',
+        FIELD_NO_TRICE = 'trice_no_fake',
         FIELD_ERR_CODE = 'error_code';
 
     protected static $triggerLevel = array(
@@ -98,7 +83,10 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     protected $saveLogIfHasError = false;
     protected $ignoreRules = [
-//        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
+        //        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
+    ];
+    protected $stopRules = [
+        //        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
     ];
     /**
      * @var array|\Memcached
@@ -271,7 +259,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             if (!is_object($logData)) {
                 $logData = $this->getLogDataFromMemcache($key);
                 if (!$logData) {
-                    throw new \Exception('Cant get log data from memcache');
+                    // cache expired
+                    continue;
                 }
             }
             yield $logData;
@@ -421,7 +410,10 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     protected function getSessionKey() {
         if (!$this->_sessionKey) {
             $this->_sessionKey = md5(
-                $_SERVER['REQUEST_TIME_FLOAT'] . $_SERVER['REMOTE_ADDR'] . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']
+                (!empty($_SERVER['REQUEST_TIME_FLOAT']) ? $_SERVER['REQUEST_TIME_FLOAT'] : '')
+                . (!empty($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '')
+                . (!empty($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'cli')
+                . (!empty($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '')
                 . (!empty($_SERVER['PWD']) ? $_SERVER['PWD'] : '')
                 . (!empty($_SERVER['argv']) ? json_encode($_SERVER['argv']) : '')
             );
@@ -429,20 +421,49 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $this->_sessionKey;
     }
 
+    protected function ifStopRules(LogData $logData) {
+        if (count($this->stopRules)) {
+            foreach($this->stopRules as $rule) {
+                $i = count($rule);
+                if (!empty($rule['level']) && $rule['level'] == $logData->level) $i--;
+                if (!empty($rule['type']) && $rule['type'] == $logData->type) $i--;
+                if (!empty($rule['message']) && $rule['message'] == $logData->message) $i--;
+                if ($i == 0) return true;
+            }
+        }
+        return false;
+    }
+
     protected function add(LogData $logData) {
+
         $result = false;
         $key = $logData->logKey;
         if ($this->memcache()) {
             if (isset($this->_logData[$key])) {
                 $logData->count = $this->_logData[$key];
             }
-            $result = $this->memcache()->set($key, $logData->__toString(), $this->lifeTime);
-            if ($result) {
-                if (isset($this->_logs[$key])) {
-                    $this->_logData[$key]++;
-                } else {
-                    $this->_logData[$key] = 1;
+            try {
+                if ($this->ifStopRules($logData)) {
+                    // TODO: option & cli print
+                    echo PHP_EOL;
+                    print_r($logData);
+                    echo PHP_EOL;
+                    exit('****');
                 }
+
+                $str = $logData->__toString();
+                if ($str) {
+                    $result = $this->memcache()->set($key, $str, $this->lifeTime);
+                    if ($result) {
+                        if (isset($this->_logs[$key])) {
+                            $this->_logData[$key]++;
+                        } else {
+                            $this->_logData[$key] = 1;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                echo '<p>Error: '.$e->__toString().'</p>';
             }
         }
         if (!$result) {
@@ -459,20 +480,14 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     protected function getLogFromObject($object) {
         $fields = [];
-        $mess = '';
-        if ($object instanceof \Throwable) {
-            // Если это Exception
+        $mess = get_class($object);
+
+        if (method_exists($object, 'getCode')) {
             $fields['exception_code'] = $object->getCode();
+        }
 
-            $mess = get_class($object);
-            if ($object->getMessage()) {
-                $mess .= PHP_EOL . $object->getMessage();
-            }
-            if ($object->getPrevious()) {
-                $mess .= PHP_EOL . 'Prev: ' . $object->getPrevious()->getMessage();
-            }
-
-            $fields[self::FIELD_FILE] = $this->getRelativeFilePath($object->getFile()).':'.$object->getLine();
+        if (method_exists($object, 'getMessage') && $object->getMessage()) {
+            $mess .= PHP_EOL . $object->getMessage();
         }
         elseif (method_exists($object, '__toString')) {
             $mess .= $object->__toString();
@@ -481,6 +496,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             $mess .= get_class($object);
         }
 
+        if (method_exists($object, 'getPrevious') && $object->getPrevious()) {
+            $mess .= PHP_EOL . 'Prev: ' . $object->getPrevious()->getMessage();
+        }
+        if (method_exists($object, 'getFile')) {
+            $fields[self::FIELD_FILE] = $this->getRelativeFilePath($object->getFile()) . ':' . $object->getLine();
+        }
 
         if (method_exists($object, 'getTrace')) {
             $fields[self::FIELD_TRICE]  = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
@@ -531,16 +552,21 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     public static function flushCatchLog() {
         // TODO
-//        $log = '';//self::init()->getRenderLogs();
-//        try {
-//            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
-//                //$logs .= $this->renderItemLog($logData);
-//            }
-//        } catch (\Throwable $e) {
-//            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
-//        }
-//        self::$_userCatchLogFlag = false;
-//        return $log;
+        //        $log = '';//self::init()->getRenderLogs();
+        //        try {
+        //            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
+        //                //$logs .= $this->renderItemLog($logData);
+        //            }
+        //        } catch (\Throwable $e) {
+        //            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
+        //        }
+        //        self::$_userCatchLogFlag = false;
+        //        return $log;
+    }
+
+    public static function getRenderLogs() {
+        $logger = self::init();
+        return $logger->getViewer()->renderAllLogs(storage\FileStorage::getDataHttp(), $logger->getDataLogsGenerator());
     }
 
     /**
@@ -573,7 +599,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @return string
      */
     public static function _e($value) {
-        if (!is_string($value)) $value = json_encode($value, JSON_UNESCAPED_UNICODE);
+        if (!is_string($value)) {
+            $value = self::safe_json_encode($value, JSON_UNESCAPED_UNICODE);
+        }
         return htmlspecialchars((string)$value, ENT_NOQUOTES | ENT_IGNORE, 'utf-8');
     }
 
@@ -776,24 +804,11 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $slr . $vars;
     }
 
-//    public function getRenderLogs($renderCallback = null) {
-//        if (!$renderCallback) $renderCallback = [storage\FileStorage::class, 'renderItemLog'];
-//        $logs = '';
-//        if (!is_callable($renderCallback)) return '<h3>$renderCallback is not calable '.json_encode($renderCallback).'</h3>';
-//        try {
-//            foreach ($this->getDataLogsGenerator() as $key => $logData) {
-//                $logs .= call_user_func_array($renderCallback, [$logData]);
-//            }
-//        } catch (\Throwable $e) {
-//            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
-//        }
-//        return $logs;
-//    }
-
     public function getLogDataFromMemcache($key) {
         $raw = json_decode($this->memcache()->get($key), true);
         $logData = new LogData;
         if (!is_array($raw)) {
+            echo 'LOG: '.$this->memcache()->get($key).PHP_EOL;
             return null;
         }
         foreach ($raw as $prop => $val) {
@@ -816,7 +831,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function critical($msg, array $tags = array(), array $fields = array()) {
+    public function critical($message, array $tags = array(), array $fields = array()) {
         $level = self::LEVEL_CRITICAL;
         return $this->log($level, $message, $tags, $fields);
     }
@@ -846,8 +861,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public static function logger($level, $msg, $tags = array(), array $fields = array()) {
-        return static::init()->log($level, $msg, $tags, $fields);
+    public static function logger($level, $message, $tags = array(), array $fields = array()) {
+        return static::init()->log($level, $message, $tags, $fields);
     }
 
     protected static $_byteMemoryLimit;
@@ -876,7 +891,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
                 $i = count($rule);
                 if (!empty($rule['level']) && $rule['level'] == $level) $i--;
                 if (!empty($rule['type']) && $rule['type'] == $fields[self::FIELD_LOG_TYPE]) $i--;
-                if (!empty($rule['message']) && $rule['message'] == $msg) $i--;
+                if (!empty($rule['message']) && is_string($msg) && $rule['message'] == $msg) $i--;
                 if ($i == 0) return true;
             }
         }
@@ -885,6 +900,15 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             $this->_errCount++;
         }
         $this->_count++;
+
+        if ($this->_count == 1000) {
+            //TODO: cli print
+            echo '<p>To many Logs</p>';
+        }
+        elseif ($this->_count > 100) {
+            // TODO: print in cli mode
+            return;
+        }
 
         if (self::isMemoryOver()) {
             $this->_overMemory = true;
@@ -946,7 +970,36 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return true;
     }
 
+    static function safe_json_encode($value, $options = 0, $depth = 512) {
+        $encoded = json_encode($value, $options, $depth);
+        switch (json_last_error()) {
+            case JSON_ERROR_NONE:
+                return $encoded;
+            case JSON_ERROR_DEPTH:
+                throw new \Exception('json_encode: Maximum stack depth exceeded');
+            case JSON_ERROR_STATE_MISMATCH:
+                throw new \Exception('json_encode: Underflow or the modes mismatch');
+            case JSON_ERROR_CTRL_CHAR:
+                throw new \Exception('json_encode: Unexpected control character found');
+            case JSON_ERROR_SYNTAX:
+                throw new \Exception('json_encode: Syntax error, malformed JSON');
+            case JSON_ERROR_UTF8:
+                return self::safe_json_encode(self::utf8ize($value), $options, $depth);
+            default:
+                throw new \Exception('json_encode: Unknown error');
+        }
+    }
 
+    static function utf8ize($mixed) {
+        if (is_array($mixed)) {
+            foreach ($mixed as $key => $value) {
+                $mixed[$key] = self::utf8ize($value);
+            }
+        } else if (is_string ($mixed)) {
+            $mixed = mb_convert_encoding($mixed, 'UTF-8');
+        }
+        return $mixed;
+    }
 }
 
 class LogData {
@@ -966,7 +1019,7 @@ class LogData {
         foreach (get_object_vars($this) as $k=>$v) {
             $data[$k] = $v;
         }
-        return json_encode($data, JSON_UNESCAPED_UNICODE);
+        return PHPErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE);
     }
 }
 

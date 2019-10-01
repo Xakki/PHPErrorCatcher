@@ -1,4 +1,4 @@
-<?
+<?php
 
 use xakki\phperrorcatcher\PHPErrorCatcher;
 
@@ -28,38 +28,31 @@ require_once __DIR__ . '/../vendor/autoload.php';
 // Шаблон темы задан по умолчанию в параметре \PHPErrorCatcher::$mailerSubjectPrefix
 
 PHPErrorCatcher::init([
-    'logPath' => __DIR__ . '/runtime/log',
-    'debugMode' => (isset($_COOKIE['debug']) || isset($_GET['debug'])),
-    'catcherLogName' => 'myCatcherLog',
-    'pdo' => [
-        'dbname' => 'test',
-        'username' => 'testUser',
-        'passwd' => 'testPass'
+    'logFields' => ['project' => (defined('IS_DEV') ? 'unidoski.dev' : 'unidoski')],
+    'debugMode' => (isset($_COOKIE['changeMe']) || isset($_GET['changeMe'])),
+    'logCookieKey' => 'changeMe2',
+    'dirRoot' => rtrim(dirname(__DIR__), '/'),
+    'saveLogIfHasError' => !defined('IS_DEV'),
+    'ignoreRules' => [['level' => PHPErrorCatcher::LEVEL_NOTICE, 'type' => PHPErrorCatcher::TYPE_TRIGGER]],
+    'storage' => [
+        'ElasticStorage' => [
+            'url' => 'http://192.168.0.1:9200',
+            'auth' => 'elastic:changeMe3',
+        ],
+        'FileStorage' => [
+            'logPath' => __DIR__ . '/runtime/log',
+        ],
     ],
-    'mailer' => function () {
-        global $config;
-        $transport = $config['components']['mailer']['transport'];
-        $cmsmailer = new \PHPMailer\PHPMailer\PHPMailer();
-        $cmsmailer->Host = $transport['host'];
-        $cmsmailer->Port = $transport['port'];
-        $cmsmailer->SMTPAuth = true;
-        $cmsmailer->SMTPDebug = 3;
-        $cmsmailer->Username = $transport['username'];
-        $cmsmailer->Password = $transport['password'];
-        $cmsmailer->Sender = $transport['username'];
-        $cmsmailer->FromName = 'PHPErrorCatcher';
-        $cmsmailer->Mailer = 'smtp';
-        $cmsmailer->ContentType = 'text/html';
-        $cmsmailer->CharSet = 'utf-8';
-        $cmsmailer->AddAddress('test@example.ru');
-        return $cmsmailer;
-    },
-    'xhprofEnable' => (isset($_COOKIE['prof']) || isset($_GET['prof'])),
-    // Можно профилировать все запросы с переданными параметрами, к примеру
-    'xhprofDir' => __DIR__ . '/../vendor/lox/xhprof',
-    // путь к расположению библиотек профаилера
-    'minTimeProfiled' => 6000,
-    // профилируем только медленные скрипты, работающие больше 6сек
+    'plugin' => [
+        'JsLogPlugin' => [
+            'initGetKey' => 'changeMe4',
+        ],
+    ],
+    'viewer' => [
+        'class' => 'FileViewer',
+        'initGetKey' => 'changeMe5',
+    ],
+    
 ]);
 
 

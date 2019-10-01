@@ -42,7 +42,7 @@ class MailerPlugin extends BasePlugin {
                 '{SITE}',
                 '{DATE}'
             ], [
-                $_SERVER['HTTP_HOST'],
+                (empty($_SERVER['HTTP_HOST']) ? '' : $_SERVER['HTTP_HOST']),
                 date(' Y-m-d H:i:s')
             ], $this->mailerSubjectPrefix);
             return $cmsmailer->Send();

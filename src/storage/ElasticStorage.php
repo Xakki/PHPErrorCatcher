@@ -3,6 +3,7 @@
 namespace xakki\phperrorcatcher\storage;
 
 use xakki\phperrorcatcher\LogData;
+use xakki\phperrorcatcher\PHPErrorCatcher;
 
 class ElasticStorage extends BaseStorage {
 
@@ -28,7 +29,7 @@ class ElasticStorage extends BaseStorage {
 //        $meta = '{"index":{}}';
         foreach($logsData as $key => $logData) {
             $data[] = $meta;
-            $data[] = json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
+            $data[] = PHPErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
         }
         // . '/' . $this->index . '/' . $this->type
         return $this->sendDataToElastic(implode(PHP_EOL, $data).PHP_EOL, $this->url .'/_bulk', 'POST');
@@ -75,6 +76,8 @@ class ElasticStorage extends BaseStorage {
             $data['http']['scheme'] = $serverData['REQUEST_SCHEME'];
         if (!empty($serverData['HTTP_USER_AGENT']))
             $data['user_agent'] = $this->getParceUserAgent($serverData['HTTP_USER_AGENT']);
+        if (!empty($serverData['argv']))
+            $data['http']['argv'] = $serverData['argv'];
         return $data;
     }
 
@@ -204,7 +207,7 @@ class ElasticStorage extends BaseStorage {
     protected function sendDataToElastic($data, $url, $method) {
 
         if (!is_string($data)) {
-            $data = json_encode($data, JSON_UNESCAPED_UNICODE);
+            $data = PHPErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE);
         }
 
         $params = [

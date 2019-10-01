@@ -45,7 +45,7 @@ class FileStorage extends BaseStorage {
             'http' => self::getDataHttp(),
             'logs' => ($logs instanceof \Traversable ? iterator_to_array($logs) : $logs)
         ];
-        return str_replace(PHP_EOL, '\\n', json_encode($data, JSON_UNESCAPED_UNICODE));
+        return str_replace(PHP_EOL, '\\n', PHPErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE));
     }
 
     public static function getDataHttp() {
