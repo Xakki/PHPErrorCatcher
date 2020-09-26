@@ -12,6 +12,7 @@ class JsLogPlugin extends BasePlugin {
      */
     protected $catcherLogName = 'myCatcherLog';
     protected $catcherLogFileSeparate = true;
+    protected $level = PHPErrorCatcher::LEVEL_NOTICE;
 
     function __construct(PHPErrorCatcher $owner, $config = []) {
         parent::__construct($owner, $config);
@@ -48,7 +49,7 @@ class JsLogPlugin extends BasePlugin {
         if (!empty($_POST['l'])) $vars['line'] = $_POST['l'];
 
         $GLOBALS['skipRenderBackTrace'] = 1;
-        $owner->log(PHPErrorCatcher::LEVEL_WARNING, $errstr, ['js', $this->catcherLogName], $vars);
+        $owner->log($this->level, $errstr, ['js', $this->catcherLogName], $vars);
 
     }
 

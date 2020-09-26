@@ -18,11 +18,10 @@ use xakki\phperrorcatcher\LogData;
 class FileStorage extends BaseStorage {
     /* Config */
     protected $logPath = '';
+    protected $tplPath = '%Y.%m/%d';
     protected $logDir = '/logsError';
     protected $backUpDir = '/_backUp'; 
     protected $limitFileSize = 10485760;
-    protected $byDir = 'Y.m'; // Y.m.d
-    protected $byFile = 'd'; // H
 
     const FILE_EXT = 'plog';
 
@@ -30,7 +29,7 @@ class FileStorage extends BaseStorage {
     function __destruct() {
 
         if ($this->_owner->needSaveLog()) {
-            if($this->putData($this->getSerializeLogs($this->_owner->getDataLogsGenerator()))) {
+            if($this->putData($this->_owner->getDataLogsGenerator())) {
                 $this->_owner->successSaveLog();
             }
         }
@@ -55,6 +54,8 @@ class FileStorage extends BaseStorage {
             $data['ip_addr'] = $serverData['REMOTE_ADDR'];
         if (!empty($serverData['HTTP_HOST']))
             $data['host'] = substr($serverData['HTTP_HOST'],0, 500);
+        else
+            $data['host'] = (isset($serverData['HTTP_X_SERVER_NAME']) ? $serverData['HTTP_X_SERVER_NAME'] : (isset($serverData['SERVER_NAME']) ? $serverData['SERVER_NAME'] : ''));
         if (!empty($serverData['REQUEST_METHOD']))
             $data['method'] = $serverData['REQUEST_METHOD'];
         if (!empty($serverData['REQUEST_URI']))
@@ -70,14 +71,26 @@ class FileStorage extends BaseStorage {
         return $data;
     }
 
+    /**
+     * @param \Generator|LogData[] $logData
+     */
     private function putData($fileLog) {
-        $path = $this->logPath . $this->logDir . '/' . date($this->byDir);
-        if (!file_exists($path)) {
+        $lastSlash = strrpos($this->tplPath, '/');
+        $fileName = strftime(substr($this->tplPath, 0, $lastSlash));
+
+        $fileName = $this->logPath . $this->logDir . '/'.$fileName;
+
+        if (!file_exists($fileName)) {
             $oldUmask = umask(0);
-            mkdir($path, 0775, true);
+            mkdir($fileName, 0775, true);
             umask($oldUmask);
         }
-        $fileName = $path . '/' . date($this->byFile) . '.'.self::FILE_EXT;
+//\xakki\phperrorcatcher\PHPErrorCatcher::FIELD_LOG_NAME
+        $fileName = $fileName . '/' . strftime(substr($this->tplPath, $lastSlash));
+        if ($this->_owner->getErrCount()) {
+            $fileName .= '.err';
+        }
+        $fileName .= '.'.self::FILE_EXT;
 
         $flagNew = true;
         if (file_exists($fileName)) {
@@ -101,7 +114,7 @@ class FileStorage extends BaseStorage {
                 $flagNew = false;
             }
         }
-        file_put_contents($fileName, $fileLog.PHP_EOL, FILE_APPEND);
+        file_put_contents($fileName, $this->getSerializeLogs($fileLog).PHP_EOL, FILE_APPEND);
         if ($flagNew) chmod($fileName, 0777);
     }
 

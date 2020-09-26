@@ -212,6 +212,7 @@ class ElasticStorage extends BaseStorage {
 
         $params = [
             CURLINFO_HEADER_OUT => false,
+            CURLOPT_TIMEOUT => 3,
             CURLOPT_VERBOSE => false,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: '.((strpos($url, '/_bulk')) ? 'application/x-ndjson' : 'application/json'),

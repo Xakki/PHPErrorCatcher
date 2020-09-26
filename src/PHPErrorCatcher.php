@@ -50,6 +50,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     // Config
     /************************************/
 
+    protected $showError = false;
     protected $debugMode = false;//ERROR_DEBUG_MODE
     protected $logTimeProfiler = false;// time execute log
     protected $logCookieKey = '';
@@ -436,6 +437,11 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     protected function add(LogData $logData) {
 
+        if ($this->showError) {
+            echo PHP_EOL;
+            print_r($logData);
+            echo PHP_EOL;
+        }
         $result = false;
         $key = $logData->logKey;
         if ($this->memcache()) {
@@ -462,6 +468,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
                         }
                     }
                 }
+
             } catch (\Throwable $e) {
                 echo '<p>Error: '.$e->__toString().'</p>';
             }
@@ -621,6 +628,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     }
 
     public static function renderDebugArray($arr, $arrLen = 6, $strLen = 1024) {
+        if (!is_array($arr)) return $arr;
         $i = $arrLen;
         $args = [];
         foreach ($arr as $v) {

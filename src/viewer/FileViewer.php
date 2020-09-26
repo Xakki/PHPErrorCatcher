@@ -100,9 +100,8 @@ class FileViewer extends BaseViewer {
         }
 
         if (!isset($_GET['only']) && empty($_GET['backup'])) {
-            echo '<html>';
-            echo $this->renderViewHead($file);
-            echo '<body>';
+            $this->renderViewHead($file);
+
             $home = $this->getHomeUrl('');
 
 
@@ -194,174 +193,7 @@ class FileViewer extends BaseViewer {
      * @return string
      */
     public function renderViewHead($file) {
-        ?>
-        <head>
-            <title>LogView<?= ($file ? ':' . $file : '') ?></title>
-            <meta http-equiv="Cache-Control" content="no-cache">
-            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-            <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-            <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-            <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-            <script>
-				selectText = function (e) {
-					var r, s;
-					if (window.getSelection) {
-						s = window.getSelection();
-						if (s.setBaseAndExtent) {
-							s.setBaseAndExtent(e, 0, e, e.innerText.length - 1);
-						} else {
-							r = document.createRange();
-							r.selectNodeContents(e);
-							s.removeAllRanges();
-							s.addRange(r);
-						}
-					} else if (document.getSelection) {
-						s = document.getSelection();
-						r = document.createRange();
-						r.selectNodeContents(e);
-						s.removeAllRanges();
-						s.addRange(r);
-					} else if (document.selection) {
-						r = document.body.createTextRange();
-						r.moveToElementText(e);
-						r.select();
-					}
-				}
-
-				$(document).ready(function () {
-					$('.linkDel').on('click', function () {
-						if (confirm('Удалить?'))
-							return true;
-						return false;
-					});
-					$('.xdebug-item-file a, .bug_file a').on('click', function () {
-						selectText(this);
-						return false;
-					});
-				});
-            </script>
-            <?= $this->renderViewScript() ?>
-        </head>
-        <?php
-    }
-
-    public function renderViewScript() {
-        ?>
-        <style>
-            .xsp.unfolded > .xsp-head::before {
-                content: " - ";
-            }
-
-            .xsp > .xsp-head::before {
-                content: " + ";
-            }
-
-            .xsp > .xsp-body {
-                display: none;
-            }
-
-            .xsp.unfolded > .xsp-body {
-                display: block;
-            }
-
-            .xsp > .xsp-head {
-                color: #797979;
-                cursor: pointer;
-            }
-
-            .xsp > .xsp-head:hover {
-                color: black;
-            }
-
-            .pecToolbar {
-                position: fixed;
-                z-index: 9999;
-                top: 10px;
-                right: 10px;
-                min-width: 300px;
-                max-width: 40%;
-                padding: 10px;
-                background: gray;
-                text-align: right;
-            }
-
-            .pecToolbar > .xsp-body {
-                margin-top: 10px;
-                text-align: left;
-            }
-
-            .xdebug > .xsp-body {
-                padding: 0;
-                padding: 0 0 0 1em;
-                border-bottom: 1px dashed #C3CBD1;
-                color: black;
-                font-size: 10px;
-            }
-            .trace > .xsp-body {
-                white-space: pre-wrap;
-            }
-
-            .bugs {
-                border-top: 3px gray solid;
-                margin-top: 10px;
-                padding-top: 5px;
-            }
-
-            .bug_item {
-                padding: 10px 5px;
-            }
-
-            .bug_item span {
-                padding: 0 5px 0 0;
-            }
-
-            .bug_time {
-            }
-
-            .bug_mctime {
-                font-style: italic;
-                font-size: 0.8em;
-                margin: 0 3px;
-            }
-
-            .bug_type {
-                font-weight: bold;
-            }
-
-            .bugs_post {
-                dispaly: inline-flex;
-            }
-
-            .bug_str {
-            }
-
-            .bug_vars .xsp-body,
-            .bug_vars .small,
-            .bugs_post .xsp-body,
-            .bugs_post .small {
-                white-space: pre-wrap;
-            }
-
-            .bug_file {
-            }
-
-            <?php  foreach ($this->_errorListView as $errno => $error): ?>
-            .bug_level_<?=$errno?> .bug_type {
-                color: <?=$error['color']?>;
-            }
-            .pre {
-                white-space: pre;
-            }
-            <?php endforeach; ?>
-        </style>
-        <script>
-			function bugSp(obj) {
-				var obj = obj.parentNode;
-				if (obj.className.indexOf('unfolded') >= 0) obj.className = obj.className.replace('unfolded', ''); else obj.className = obj.className + ' unfolded';
-			}
-        </script>
-        <?php
+        include __DIR__.'/file/tpl.php';
     }
 
     /**
@@ -672,8 +504,9 @@ class FileViewer extends BaseViewer {
 //        if ($this->_profilerUrl) {
 //            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
 //        }
-        $html = '<div class="bugs">' .
-            '<span class="bugs_host">' . $httpData->host . '</span> ';
+        $html = '<div class="bugs">';
+        if (!empty($httpData->host))
+            $html .= '<span class="bugs_host">' . $httpData->host . '</span> ';
         if (!empty($httpData->url))
             $html .= '<span class="bugs_uri">'. $httpData->method.' ' . $httpData->url . '</span> ';
         if (!empty($httpData->ip_addr))
@@ -682,22 +515,6 @@ class FileViewer extends BaseViewer {
             $html .= '<span class="bugs_ref">' . $httpData->referrer . '</span> ';
         if (!empty($httpData->overMemory))
             $html .= '<span class="bugs_alert">Over memory limit</span> ';
-
-//        if (!empty($this->_owner->get('_postData'))) {
-//            $res .= PHP_EOL . '<div class="bugs_post xsp"><div class="xsp-head" onclick="bugSp(this)">POST</div><div class="xsp-body pre">'
-//                . $this->_owner->renderVars($this->_owner->get('_postData')) . '</div></div>';
-////            $res .= PHP_EOL . '<div class="bugs_post">' . self::renderVars($this->_postData) . '</div>';
-//        }
-//        if (!empty($this->_owner->get('_cookieData'))) {
-//            $res .= PHP_EOL . '<div class="bugs_post xsp"><div class="xsp-head" onclick="bugSp(this)">COOKIE</div><div class="xsp-body pre">'
-//                . $this->_owner->renderVars($this->_owner->get('_cookieData')) . '</div></div>';
-////            $res .= PHP_EOL . '<div class="bugs_post">' . self::renderVars($this->_postData) . '</div>';
-//        }
-//        if (!empty($this->_owner->get('_sessionData'))) {
-//            $res .= PHP_EOL . '<div class="bugs_post xsp"><div class="xsp-head" onclick="bugSp(this)">SESSION</div><div class="xsp-body pre">'
-//                . $this->_owner->renderVars($this->_owner->get('_sessionData')) . '</div></div>';
-////            $res .= PHP_EOL . '<div class="bugs_post">' . self::renderVars($this->_postData) . '</div>';
-//        }
 
         foreach ($logDatas as $logData) {
             $html .= $this->renderItemLog($logData);
@@ -727,14 +544,7 @@ class FileViewer extends BaseViewer {
             $res .= '<span class="bug_file"> File <a href="idea://open?url=file://' . $fl[0] . '&line=' . $fl[1] . '">' . $logData->file . '</a></span>';
         }
         $res .= '<div class="bug_str">' . PHPErrorCatcher::_e($logData->message) . '</div>';
-//        if ($vars) {
-//            $vars = self::renderVars($vars);
-//            if (mb_strlen($vars) > $this->limitString) {
-//                $debug .= '<div class="bug_vars xsp"><div class="xsp-head" onclick="bugSp(this)">Vars</div><div class="xsp-body">' . $vars . '</div></div>';
-//            } else {
-//                $debug .= '<div class="bug_vars small">' . $vars . '</div>';
-//            }
-//        }
+
         if ($logData->trace) {
             $res .= '<div class="trace xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body pre">'
                 . $logData->trace
@@ -745,48 +555,4 @@ class FileViewer extends BaseViewer {
         return $res;
     }
 
-
-
-//    /**
-//     * Функция трасировки ошибок
-//     * @param int $slice
-//     * @param array $traceArr
-//     * @return string
-//     */
-//    public static function renderBackTrace($slice = 1, $traceLimit = 5, $traceArr = null) {
-//        $s = '<div class="xdebug xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body">';
-//        if (!$traceArr || !is_array($traceArr)) {
-//            $traceArr = debug_backtrace();
-//        }
-//        $traceArr = array_slice($traceArr, $slice, $traceLimit);
-//        $i = 0;
-//        foreach ($traceArr as $arr) {
-//            $s .= '<div class="xdebug-item" style="margin-left:' . (10 * $i) . 'px;">' . '<span class="xdebug-item-file">';
-//            if (isset($arr['line']) and $arr['file']) {
-//                //                $s .= ' in <a href="file:/' . $arr['file'] . '">' . $arr['file'] . ':' . $arr['line'] . '</a> , ';
-//                $s .= ' in <a href="idea://open?url=file://' . $arr['file'] . '&line=' . $arr['line'] . '">' . $arr['file'] . ':' . $arr['line'] . '</a> , ';
-//            }
-//            if (isset($arr['class'])) $s .= '#class <b>' . $arr['class'] . '-></b>';
-//            $s .= '</span>';
-//            //$s .= '<br/>';
-//            $args = [];
-//            if (isset($arr['args'])) {
-//                foreach ($arr['args'] as $v) {
-//                    if (is_null($v)) $args[] = '<b class="xdebug-item-arg-null">NULL</b>'; else if (is_array($v)) $args[] = '<b class="xdebug-item-arg-arr">Array[' . sizeof($v) . ']</b>'; else if (is_object($v)) $args[] = '<b class="xdebug-item-arg-obj">Object:' . get_class($v) . '</b>'; else if (is_bool($v)) $args[] = '<b class="xdebug-item-arg-bool">' . ($v ? 'true' : 'false') . '</b>'; else {
-//                        $v = (string)@$v;
-//                        $str = static::_e(substr($v, 0, 128));
-//                        if (strlen($v) > 128) $str .= '...';
-//                        $args[] = '<b class="xdebug-item-arg">' . $str . '</b>';
-//                    }
-//                }
-//            }
-//            if (isset($arr['function'])) {
-//                $s .= '<span class="xdebug-item-func"><b>' . $arr['function'] . '</b>(' . implode(',', $args) . ')</span>';
-//            }
-//            $s .= '</div>';
-//            $i++;
-//        }
-//        $s .= '</div></div>';
-//        return $s;
-//    }
 }
