@@ -87,11 +87,6 @@ class FileViewer extends BaseViewer {
         ], '', $_GET[$this->initGetKey]);
 
         $file = trim($url, '/');
-        $tabs = [
-            'BD' => '',
-            'PROF' => '',
-            'PHPINFO' => '',
-        ];
 
         if (!empty($_GET['download'])) {
             header('Content-Type: application/octet-stream');
@@ -102,21 +97,6 @@ class FileViewer extends BaseViewer {
         if (!isset($_GET['only']) && empty($_GET['backup'])) {
             $this->renderViewHead($file);
 
-            $home = $this->getHomeUrl('');
-
-
-            echo '<ul class="nav nav-tabs">';
-            echo '<li class="nav-item"><a class="nav-link' . (!isset($tabs[$file]) ? ' active' : '') . '" href="' . $home . '/">Логи</a></li>';
-
-            if (file_exists($this->_owner->getRawLogFile())) {
-                echo '<li class="nav-item"><a class="text-danger nav-link' . ($file=='rawlog' ? ' active' : '') . '" href="' . $home . 'rawlog">Errors</a></li>';
-            }
-            //($this->owner->getPdo() ? '<li class="nav-item"><a class="nav-link' . ($file == 'BD' ? ' active' : '') . '" href="' . $home . 'BD">BD</a></li>' : '') .
-            //($this->owner->get('_profilerStatus') ? '<li class="nav-item"><a class="nav-link' . ($file == 'PROF' ? ' active' : '') . '" href="' . $home . 'PROF&source=' . $this->owner->get('profiler_namespace') . '&run=">Профаилер</a></li>' : '') .
-            echo '<li class="nav-item"><a class="nav-link' . ($file == 'PHPINFO' ? ' active' : '') . '" href="' . $home . 'PHPINFO">PHPINFO</a></li>';
-            echo '<li class="nav-item"><a class="nav-link" href="?" target="_blank">HOME</a></li>';
-            echo '<li class="nav-item"><a class="nav-link">Core ver: '.PHPErrorCatcher::VERSION.'; Viewer ver: '.self::VERSION.'</a></li>';
-            echo  '</ul>';
         }
 
 
@@ -133,7 +113,7 @@ class FileViewer extends BaseViewer {
                     unlink($this->_owner->getRawLogFile());
                     echo '--empty--';
                 } else {
-                    echo '<p><a href="' . $home . 'rawlog&del=1" class="linkDel">Удалить</a></p>';
+                    echo '<p><a href="' . $this->getHomeUrl('') . 'rawlog&del=1" class="linkDel">Удалить</a></p>';
                     echo $this->renderJsonLogs($this->_owner->getRawLogFile());
                 }
             } else {
