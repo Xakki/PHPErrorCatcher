@@ -30,6 +30,6 @@
     }
   },
   "config": {
-    "preferred-install": "source"
+    "preferred-install": "dist"
   }
 }
