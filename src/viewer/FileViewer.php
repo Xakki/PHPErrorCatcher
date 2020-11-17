@@ -58,20 +58,15 @@ class FileViewer extends BaseViewer {
 
     function __construct(PHPErrorCatcher $owner, $config = []) {
         parent::__construct($owner, $config);
-        if (empty($this->initGetKey)) return;
+        if (empty($this->initGetKey)) {
+            echo '<p>need initGetKey for FileViewer</p>';
+            exit();
+        }
         $this->_fileStorage = $owner->getStorage('FileStorage');
         if (!$this->_fileStorage) {
             echo '<p>need FileStorage for FileViewer</p>';
             exit();
         }
-        ini_set("memory_limit", "128M");
-
-        ob_start();
-        $html = $this->renderView();
-        $html .= ob_get_contents();
-        ob_end_clean();
-        echo $html;
-        exit();
     }
 
     /**
@@ -100,13 +95,13 @@ class FileViewer extends BaseViewer {
         }
 
 
-//        if ($file == 'BD') {
-//            echo $this->viewRenderBD();
-//        }
-//        elseif ($file == 'PROF') {
-//            echo $this->viewRenderPROF();
-//        }
-//        else
+        //        if ($file == 'BD') {
+        //            echo $this->viewRenderBD();
+        //        }
+        //        elseif ($file == 'PROF') {
+        //            echo $this->viewRenderPROF();
+        //        }
+        //        else
         if ($file == 'rawlog') {
             if (file_exists($this->_owner->getRawLogFile())) {
                 if (!empty($_GET['del'])) {
@@ -479,11 +474,11 @@ class FileViewer extends BaseViewer {
      * @return string
      */
     public function renderAllLogs($httpData, $logDatas) {
-//        $this->_owner->setSafeParams();
-//        $profilerUrlTag = '';
-//        if ($this->_profilerUrl) {
-//            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
-//        }
+        //        $this->_owner->setSafeParams();
+        //        $profilerUrlTag = '';
+        //        if ($this->_profilerUrl) {
+        //            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
+        //        }
         $html = '<div class="bugs">';
         if (!empty($httpData->host))
             $html .= '<span class="bugs_host">' . $httpData->host . '</span> ';
@@ -509,7 +504,7 @@ class FileViewer extends BaseViewer {
      */
     public static function renderItemLog($logData) {
         $res = '<div class="bug_item bug_level_' . $logData->level . '">'
-            . '<span class="bug_time">' . date('H:i:s', $logData->timestamp) . '</span>'
+            . '<span class="bug_time">' . date('H:i:s', (int) ($logData->timestamp)/1000) . '</span>'
             . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '['.$logData->count.']' : '') . '</span>';
         //(isset($logData->fields[PHPErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PHPErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
         if ($logData->tags) {

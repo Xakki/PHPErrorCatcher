@@ -167,9 +167,11 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return static::$_obj;
     }
 
+    protected $_configOrigin = [];
     public function __construct($config = []) {
         static::$_obj = $this;
         try {
+            $this->_configOrigin = $config;
             if (empty($config['storage'])) throw new \Exception('Storages config is require');
 
             $this->applyConfig($config);
@@ -196,8 +198,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             if (!empty($config['plugin']))
                 $this->initPlugins($config['plugin']);
 
-            if (!empty($config['viewer']))
+            if (!empty($config['viewer'])) {
                 $this->initViewer($config['viewer']);
+            }
 
         } catch (\Throwable $e) {
             if ($this->debugMode) {
@@ -390,7 +393,6 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     }
 
     protected function initViewer($config) {
-        if (!isset($_GET[$config['initGetKey']])) return;
 
         if (class_exists(__NAMESPACE__ . '\\viewer\\' . $config['class'])) {
             $viewer = __NAMESPACE__ . '\\viewer\\' . $config['class'];
@@ -403,9 +405,21 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             throw new \Exception('Viewr `' . $viewer . '` must be implement from plugin\BasePlugin');
         }
         $this->_viewer = new $viewer($this, $config);
-        $this->_isViewMode = true;
 
-        return null;
+        if (isset($_GET[$config['initGetKey']])) {
+            $this->_isViewMode = true;
+            ini_set("memory_limit", "128M");
+
+            ob_start();
+            $html = $this->getViewer()
+                ->renderView();
+            $html .= ob_get_contents();
+            ob_end_clean();
+            echo $html;
+            exit();
+        }
+
+        return $this->_viewer;
     }
 
     protected function getSessionKey() {
@@ -521,8 +535,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         if ($lineExclude) {
             if (!empty($row['file']) && strpos($row['file'], $lineExclude)!==false)
                 return true;
-//            if (!empty($row['class']) && strpos($row['class'], $lineExclude)!==false)
-//                return true;
+            //            if (!empty($row['class']) && strpos($row['class'], $lineExclude)!==false)
+            //                return true;
         }
         if (!empty($row['file']) && strpos($row['file'], 'phperrorcatcher')!==false)
             return true;
@@ -573,7 +587,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     public static function getRenderLogs() {
         $logger = self::init();
-        return $logger->getViewer()->renderAllLogs(storage\FileStorage::getDataHttp(), $logger->getDataLogsGenerator());
+        return $logger->getViewer()
+            ->renderAllLogs(storage\FileStorage::getDataHttp(), $logger->getDataLogsGenerator());
+
     }
 
     /**
@@ -924,7 +940,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
         if (is_object($msg)) {
             // если это эксепшн и другие подобные объекты
-            list($msg, $fields2) = $this->getLogFromObject($msg);
+            [$msg, $fields2] = $this->getLogFromObject($msg);
             if ($fields2) $fields = array_merge($fields, $fields2);
         }
         elseif (!is_string($msg)) {
