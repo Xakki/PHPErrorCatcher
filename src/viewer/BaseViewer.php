@@ -8,11 +8,13 @@ namespace xakki\phperrorcatcher\viewer;
  * @package xakki\phperrorcatcher\viewer
  * @method string getInitGetKey
  */
-abstract class BaseViewer extends \xakki\phperrorcatcher\Base {
+abstract class BaseViewer extends \xakki\phperrorcatcher\Base
+{
 
     protected $initGetKey;
 
-    public function getHomeUrl($end = '/') {
+    public function getHomeUrl($end = '/')
+    {
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
         return $url['path'] . '?' . $this->getInitGetKey() . '=' . $end;

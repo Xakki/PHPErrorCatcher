@@ -2,16 +2,19 @@
 
 namespace xakki\phperrorcatcher\storage;
 
+use Generator;
 use xakki\phperrorcatcher\LogData;
 use xakki\phperrorcatcher\PHPErrorCatcher;
 
-class ElasticStorage extends BaseStorage {
+class ElasticStorage extends BaseStorage
+{
 
     protected $index = 'phplogs';
     protected $url = 'http://localhost:9200';
     protected $auth = ''; // user:pass
 
-    function __destruct() {
+    function __destruct()
+    {
         if ($this->_owner->needSaveLog()) {
 //            $this->initLogIndex();
             if ($this->putData($this->_owner->getDataLogsGenerator(), $_SERVER)) {
@@ -21,21 +24,23 @@ class ElasticStorage extends BaseStorage {
     }
 
     /**
-     * @param \Generator|LogData[] $logData
+     * @param Generator|LogData[] $logData
      */
-    protected function putData($logsData, $serverData) {
+    protected function putData($logsData, $serverData)
+    {
         $data = [];
-        $meta = json_encode(['index' => [ "_index" => $this->index]]);
+        $meta = json_encode(['index' => ["_index" => $this->index]]);
 //        $meta = '{"index":{}}';
-        foreach($logsData as $key => $logData) {
+        foreach ($logsData as $key => $logData) {
             $data[] = $meta;
             $data[] = PHPErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
         }
         // . '/' . $this->index . '/' . $this->type
-        return $this->sendDataToElastic(implode(PHP_EOL, $data).PHP_EOL, $this->url .'/_bulk', 'POST');
+        return $this->sendDataToElastic(implode(PHP_EOL, $data) . PHP_EOL, $this->url . '/_bulk', 'POST');
     }
 
-    public function getParceUserAgent($user_agent) {
+    public function getParceUserAgent($user_agent)
+    {
         return [
             'original' => $user_agent
         ];
@@ -44,7 +49,8 @@ class ElasticStorage extends BaseStorage {
     /**
      * @param LogData $logData
      */
-    protected function collectLogData($logData, $serverData) {
+    protected function collectLogData($logData, $serverData)
+    {
 
         $data = [
             "@timestamp" => $logData->timestamp,
@@ -61,7 +67,7 @@ class ElasticStorage extends BaseStorage {
             $data['trace'] = $logData->trace;
         if ($logData->file)
             $data['file'] = $logData->file;
-        
+
         if (!empty($serverData['REMOTE_ADDR']))
             $data['http']['ip_addr'] = $serverData['REMOTE_ADDR'];
         if (!empty($serverData['HTTP_HOST']))
@@ -81,7 +87,8 @@ class ElasticStorage extends BaseStorage {
         return $data;
     }
 
-    protected function initLogIndex() {
+    protected function initLogIndex()
+    {
         $data = [
             "settings" => ['number_of_shards' => 1],
             "mappings" => [
@@ -204,7 +211,8 @@ class ElasticStorage extends BaseStorage {
         $this->sendDataToElastic($data, $this->url . '/' . $this->index, 'PUT');
     }
 
-    protected function sendDataToElastic($data, $url, $method) {
+    protected function sendDataToElastic($data, $url, $method)
+    {
 
         if (!is_string($data)) {
             $data = PHPErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE);
@@ -215,7 +223,7 @@ class ElasticStorage extends BaseStorage {
             CURLOPT_TIMEOUT => 3,
             CURLOPT_VERBOSE => false,
             CURLOPT_HTTPHEADER => [
-                'Content-Type: '.((strpos($url, '/_bulk')) ? 'application/x-ndjson' : 'application/json'),
+                'Content-Type: ' . ((strpos($url, '/_bulk')) ? 'application/x-ndjson' : 'application/json'),
                 'Accept: application/json',
             ],
             CURLOPT_POSTFIELDS => $data,
@@ -236,7 +244,7 @@ class ElasticStorage extends BaseStorage {
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url); //задаём url
-        foreach($params as $k=>$r) {
+        foreach ($params as $k => $r) {
             curl_setopt($ch, $k, $r);
         }
         $text = curl_exec($ch);

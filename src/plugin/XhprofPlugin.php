@@ -2,7 +2,11 @@
 
 namespace xakki\phperrorcatcher\plugin;
 
-class XhprofPlugin extends BasePlugin {
+use Exception;
+use XHProfRuns_Default;
+
+class XhprofPlugin extends BasePlugin
+{
 
     /**
      * Enable xhprof profiler
@@ -35,7 +39,8 @@ class XhprofPlugin extends BasePlugin {
     /**
      * Запуск профайлера
      */
-    public function initProfiler() {
+    public function initProfiler()
+    {
         if (!$this->xhprofDir || $this->_profilerStatus) return;
 
         $lib1 = $this->xhprofDir . '/xhprof_lib/utils/xhprof_lib.php';
@@ -62,11 +67,12 @@ class XhprofPlugin extends BasePlugin {
      * Завершение и сохранение профайлера
      * @return null|string
      */
-    public function endProfiler() {
+    public function endProfiler()
+    {
         if ($this->_profilerStatus) {
             $xhprof_data = xhprof_disable();
             if ($this->_time_end > $this->minTimeProfiled || $this->xhprofEnable) {
-                $xhprof_runs = new \XHProfRuns_Default();
+                $xhprof_runs = new XHProfRuns_Default();
                 $this->_profilerId = $xhprof_runs->save_run($xhprof_data, $this->profiler_namespace);
                 $this->_profilerUrl = null;
                 if ($this->_profilerId) {
@@ -78,7 +84,8 @@ class XhprofPlugin extends BasePlugin {
         return null;
     }
 
-    public function getXhprofUrl($id = '') {
+    public function getXhprofUrl($id = '')
+    {
         return '?' . $this->viewKey . '=PROF&source=' . $this->profiler_namespace . '&run=' . $id;
     }
 
@@ -90,7 +97,8 @@ class XhprofPlugin extends BasePlugin {
      * @param bool|false $simple
      * @return bool
      */
-    public function saveStatsProfiler($script = null, $info = null, $simple = false) {
+    public function saveStatsProfiler($script = null, $info = null, $simple = false)
+    {
         $this->setSafeParams();
         if (is_null($script)) {
             $script = $_SERVER['SCRIPT_NAME'];
@@ -127,12 +135,14 @@ class XhprofPlugin extends BasePlugin {
      * Получить ссылку на профалер текщего скрипта
      * @return null
      */
-    public static function getProfilerUrl() {
+    public static function getProfilerUrl()
+    {
         return self::$_obj->_profilerUrl;
     }
 
 
-    public function shutdown() {
+    public function shutdown()
+    {
         try {
             $prof = $this->endProfiler();
             if (!$prof) {
@@ -140,7 +150,7 @@ class XhprofPlugin extends BasePlugin {
                     $this->saveStatsProfiler();
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->handleException($e);
         }
     }
@@ -149,7 +159,8 @@ class XhprofPlugin extends BasePlugin {
      * Печатаем то что выдает профаилер
      * @return mixed|string
      */
-    public function viewRenderPROF() {
+    public function viewRenderPROF()
+    {
         $allowInc = [
             'callgraph' => 1,
             'typeahead' => 1,

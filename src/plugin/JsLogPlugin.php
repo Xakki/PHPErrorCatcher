@@ -4,7 +4,8 @@ namespace xakki\phperrorcatcher\plugin;
 
 use xakki\phperrorcatcher\PHPErrorCatcher;
 
-class JsLogPlugin extends BasePlugin {
+class JsLogPlugin extends BasePlugin
+{
 
     /**
      * If you want enable log-request, set this name
@@ -14,7 +15,8 @@ class JsLogPlugin extends BasePlugin {
     protected $catcherLogFileSeparate = true;
     protected $level = PHPErrorCatcher::LEVEL_NOTICE;
 
-    function __construct(PHPErrorCatcher $owner, $config = []) {
+    function __construct(PHPErrorCatcher $owner, $config = [])
+    {
         parent::__construct($owner, $config);
 
         if ($this->initGetKey && isset($_GET[$this->initGetKey])) {
@@ -30,7 +32,8 @@ class JsLogPlugin extends BasePlugin {
     /**
      * Use catche.js for log error in javascript
      */
-    public function initLogRequest(PHPErrorCatcher $owner) {
+    public function initLogRequest(PHPErrorCatcher $owner)
+    {
         if (!count($_POST)) {
             $_POST = json_decode(file_get_contents('php://input'), true);
         }

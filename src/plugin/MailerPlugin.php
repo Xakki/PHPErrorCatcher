@@ -2,11 +2,15 @@
 
 namespace xakki\phperrorcatcher\plugin;
 
-class MailerPlugin extends BasePlugin {
+use Exception;
+use PHPMailer\PHPMailer\PHPMailer;
+
+class MailerPlugin extends BasePlugin
+{
 
     /**
      * Включает отправку писем (если это PHPMailer)
-     * @var null|callback|\PHPMailer\PHPMailer\PHPMailer
+     * @var null|callback|PHPMailer
      */
     protected $mailer = null;
 
@@ -18,9 +22,10 @@ class MailerPlugin extends BasePlugin {
 
     /**
      * Получаем PHPMailer
-     * @return \PHPMailer\PHPMailer\PHPMailer|null
+     * @return PHPMailer|null
      */
-    protected function getMailer() {
+    protected function getMailer()
+    {
         if ($this->mailer && is_callable($this->mailer)) {
             $this->mailer = call_user_func_array($this->mailer, []);
         }
@@ -32,7 +37,8 @@ class MailerPlugin extends BasePlugin {
      * @param $message
      * @return bool
      */
-    private function sendErrorMail($message) {
+    private function sendErrorMail($message)
+    {
         try {
             $cmsmailer = $this->getMailer();
             if (!$cmsmailer) return false;
@@ -46,13 +52,14 @@ class MailerPlugin extends BasePlugin {
                 date(' Y-m-d H:i:s')
             ], $this->mailerSubjectPrefix);
             return $cmsmailer->Send();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->handleException($e);
         }
         return false;
     }
 
-    public function shutdown() {
+    public function shutdown()
+    {
 
         if ($this->_hasError || ($this->_allLogs && !$this->logOnlyIfError)) { // ($this->_allLogs || $this->_overMemory)
             $fileLog = $this->renderLogs();
@@ -62,7 +69,7 @@ class MailerPlugin extends BasePlugin {
                 $mailStatus = $this->sendErrorMail($fileLog);
                 $errorMailLog = ob_get_contents();
                 ob_end_clean();
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->handleException($e);
             }
             if ($mailStatus) {

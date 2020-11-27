@@ -2,10 +2,12 @@
 
 namespace xakki\phperrorcatcher\plugin;
 
-class ToolbarPlugin extends BasePlugin {
+class ToolbarPlugin extends BasePlugin
+{
 
 
-    public function renderToolbar() {
+    public function renderToolbar()
+    {
         if (!$this->_isViewMode && $this->debugMode) {
             if (empty($this->_viewAlert) && !$this->_hasError && (!$this->_profilerStatus || !static::init()->_profilerId)) return;
             echo PHPErrorViewer::renderViewScript($this);
@@ -37,7 +39,8 @@ class ToolbarPlugin extends BasePlugin {
     }
 
 
-    public function shutdown() {
+    public function shutdown()
+    {
         $this->renderToolbar();
     }
 }

@@ -5,7 +5,8 @@ namespace xakki\phperrorcatcher;
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
+class PHPErrorCatcher implements \Psr\Log\LoggerInterface
+{
     const VERSION = '0.4.11';
 
     const LEVEL_DEBUG = 'debug',
@@ -28,21 +29,21 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         FIELD_ERR_CODE = 'error_code';
 
     protected static $triggerLevel = array(
-        E_ERROR          		=> self::LEVEL_ERROR,
-        E_WARNING        		=> self::LEVEL_WARNING,
-        E_PARSE          		=> self::LEVEL_CRITICAL,
-        E_NOTICE         		=> self::LEVEL_NOTICE,
-        E_DEPRECATED         	=> self::LEVEL_WARNING,
-        E_CORE_ERROR     		=> self::LEVEL_ERROR,
-        E_CORE_WARNING   		=> self::LEVEL_WARNING,
-        E_COMPILE_ERROR  		=> self::LEVEL_CRITICAL,
-        E_COMPILE_WARNING 		=> self::LEVEL_ERROR,
-        E_USER_ERROR     		=> self::LEVEL_ERROR,
-        E_USER_WARNING   		=> self::LEVEL_WARNING,
-        E_USER_DEPRECATED   	=> self::LEVEL_WARNING,
-        E_USER_NOTICE    		=> self::LEVEL_NOTICE,
-        E_STRICT         		=> self::LEVEL_ERROR,
-        E_RECOVERABLE_ERROR  	=> self::LEVEL_ERROR,
+        E_ERROR => self::LEVEL_ERROR,
+        E_WARNING => self::LEVEL_WARNING,
+        E_PARSE => self::LEVEL_CRITICAL,
+        E_NOTICE => self::LEVEL_NOTICE,
+        E_DEPRECATED => self::LEVEL_WARNING,
+        E_CORE_ERROR => self::LEVEL_ERROR,
+        E_CORE_WARNING => self::LEVEL_WARNING,
+        E_COMPILE_ERROR => self::LEVEL_CRITICAL,
+        E_COMPILE_WARNING => self::LEVEL_ERROR,
+        E_USER_ERROR => self::LEVEL_ERROR,
+        E_USER_WARNING => self::LEVEL_WARNING,
+        E_USER_DEPRECATED => self::LEVEL_WARNING,
+        E_USER_NOTICE => self::LEVEL_NOTICE,
+        E_STRICT => self::LEVEL_ERROR,
+        E_RECOVERABLE_ERROR => self::LEVEL_ERROR,
     );
 
 
@@ -160,7 +161,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param array $config
      * @return PHPErrorCatcher
      */
-    public static function init($config = []) {
+    public static function init($config = [])
+    {
         if (!static::$_obj) {
             new self($config);
         }
@@ -168,7 +170,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     }
 
     protected $_configOrigin = [];
-    public function __construct($config = []) {
+
+    public function __construct($config = [])
+    {
         static::$_obj = $this;
         try {
             $this->_configOrigin = $config;
@@ -178,7 +182,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             $this->_time_start = microtime(true);
             if (!$this->dirRoot) $this->dirRoot = $_SERVER['DOCUMENT_ROOT'];
             if (ini_get('max_execution_time'))
-                $this->lifeTime = ini_get('max_execution_time')*2;
+                $this->lifeTime = ini_get('max_execution_time') * 2;
 
             $this->initStorage($config['storage']);
 
@@ -217,7 +221,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         $this->_storages = [];
     }
 
-    public function applyConfig($config) {
+    public function applyConfig($config)
+    {
         foreach ($config as $key => $value) {
             if (property_exists($this, $key) && substr($key, 0, 1) != '_') {
                 $this->$key = $value;
@@ -232,14 +237,16 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    public function get($key) {
+    public function get($key)
+    {
         if (property_exists($this, $key)) {
             return $this->{$key};
         }
         return null;
     }
 
-    public function getViewer() {
+    public function getViewer()
+    {
         return $this->_viewer;
     }
 
@@ -247,7 +254,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param $class
      * @return storage\BaseStorage|null
      */
-    public function getStorage($class) {
+    public function getStorage($class)
+    {
         return (isset($this->_storages[$class]) ? $this->_storages[$class] : null);
     }
 
@@ -255,7 +263,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @return \Generator|LogData[]
      * @throws \Exception
      */
-    public function getDataLogsGenerator() {
+    public function getDataLogsGenerator()
+    {
         foreach ($this->_logData as $key => $logData) {
             if (self::$_userCatchLogFlag && !isset(self::$_userCatchLogKeys[$key])) {
                 continue;
@@ -271,22 +280,23 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    public function successSaveLog() {
+    public function successSaveLog()
+    {
         $this->_successSaveLog = true;
     }
 
     /**
      * @return \Memcached|null
      */
-    public function memcache($restore = false) {
+    public function memcache($restore = false)
+    {
         if (is_null(static::$_MEMCACHE)) {
             static::$_MEMCACHE = false;
             if (is_object($this->memcacheServers)) {
                 static::$_MEMCACHE = $this->memcacheServers;
-            }
-            elseif (extension_loaded('memcached')) {
+            } elseif (extension_loaded('memcached')) {
                 static::$_MEMCACHE = new \Memcached;
-                foreach($this->memcacheServers as $server) {
+                foreach ($this->memcacheServers as $server) {
                     if (!static::$_MEMCACHE->addServer($server[0], $server[1])) {
                         trigger_error('Memcached is down', E_USER_WARNING);
                         return static::$_MEMCACHE;
@@ -300,13 +310,14 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     /**
      * When script stop
      */
-    public function handleShutdown() {
+    public function handleShutdown()
+    {
         $this->_time_end = (microtime(true) - $this->_time_start) * 1000;
 
         $error = error_get_last();
         if ($error) {
             $fields = [
-                self::FIELD_FILE => $this->getRelativeFilePath($error['file']).':'.$error['line'],
+                self::FIELD_FILE => $this->getRelativeFilePath($error['file']) . ':' . $error['line'],
                 self::FIELD_LOG_TYPE => self::TYPE_FATAL,
                 self::FIELD_ERR_CODE => $error['type']
             ];
@@ -323,7 +334,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    public function needSaveLog() {
+    public function needSaveLog()
+    {
         return (!$this->_successSaveLog && count($this->_logData) && (!$this->saveLogIfHasError || $this->_errCount));
     }
 
@@ -331,7 +343,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * Обработчик исключений
      * @param $e \Exception
      */
-    public function handleException($e) {
+    public function handleException($e)
+    {
         $fields = [self::FIELD_LOG_TYPE => self::TYPE_EXCEPTION];
         $this->log(self::LEVEL_CRITICAL, $e, ['unhandle'], $fields);
     }
@@ -344,9 +357,10 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param $errline
      * @param null $vars
      */
-    public function handleTrigger($errno, $errstr, $errfile, $errline, $vars = null) {
+    public function handleTrigger($errno, $errstr, $errfile, $errline, $vars = null)
+    {
         $fields = [
-            self::FIELD_FILE => $this->getRelativeFilePath($errfile).':'.$errline,
+            self::FIELD_FILE => $this->getRelativeFilePath($errfile) . ':' . $errline,
             self::FIELD_LOG_TYPE => self::TYPE_TRIGGER,
             self::FIELD_ERR_CODE => $errno,
             self::FIELD_TRICE => array_slice(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $this->limitTrace + 1), 1)
@@ -357,7 +371,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     /****************************************************/
 
-    protected function initStorage($configs) {
+    protected function initStorage($configs)
+    {
         foreach ($configs as $storage => $config) {
             $keyStorage = $storage;
             if (class_exists(__NAMESPACE__ . '\\storage\\' . $storage)) {
@@ -375,7 +390,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    protected function initPlugins($configs) {
+    protected function initPlugins($configs)
+    {
         foreach ($configs as $plugin => $config) {
             if (!empty($config['initGetKey']) && !isset($_GET[$config['initGetKey']]))
                 continue;
@@ -392,7 +408,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    protected function initViewer($config) {
+    protected function initViewer($config)
+    {
 
         if (class_exists(__NAMESPACE__ . '\\viewer\\' . $config['class'])) {
             $viewer = __NAMESPACE__ . '\\viewer\\' . $config['class'];
@@ -422,7 +439,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $this->_viewer;
     }
 
-    protected function getSessionKey() {
+    protected function getSessionKey()
+    {
         if (!$this->_sessionKey) {
             $this->_sessionKey = md5(
                 (!empty($_SERVER['REQUEST_TIME_FLOAT']) ? $_SERVER['REQUEST_TIME_FLOAT'] : '')
@@ -436,9 +454,10 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $this->_sessionKey;
     }
 
-    protected function ifStopRules(LogData $logData) {
+    protected function ifStopRules(LogData $logData)
+    {
         if (count($this->stopRules)) {
-            foreach($this->stopRules as $rule) {
+            foreach ($this->stopRules as $rule) {
                 $i = count($rule);
                 if (!empty($rule['level']) && $rule['level'] == $logData->level) $i--;
                 if (!empty($rule['type']) && $rule['type'] == $logData->type) $i--;
@@ -449,7 +468,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return false;
     }
 
-    protected function add(LogData $logData) {
+    protected function add(LogData $logData)
+    {
 
         if ($this->showError) {
             echo PHP_EOL;
@@ -484,7 +504,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
                 }
 
             } catch (\Throwable $e) {
-                echo '<p>Error: '.$e->__toString().'</p>';
+                echo '<p>Error: ' . $e->__toString() . '</p>';
             }
         }
         if (!$result) {
@@ -499,7 +519,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    protected function getLogFromObject($object) {
+    protected function getLogFromObject($object)
+    {
         $fields = [];
         $mess = get_class($object);
 
@@ -509,11 +530,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
         if (method_exists($object, 'getMessage') && $object->getMessage()) {
             $mess .= PHP_EOL . $object->getMessage();
-        }
-        elseif (method_exists($object, '__toString')) {
+        } elseif (method_exists($object, '__toString')) {
             $mess .= $object->__toString();
-        }
-        else {
+        } else {
             $mess .= get_class($object);
         }
 
@@ -525,20 +544,21 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
 
         if (method_exists($object, 'getTrace')) {
-            $fields[self::FIELD_TRICE]  = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
+            $fields[self::FIELD_TRICE] = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
         }
 
         return [$mess, $fields];
     }
 
-    protected static function checkTraceExclude($row, $lineExclude = null) {
+    protected static function checkTraceExclude($row, $lineExclude = null)
+    {
         if ($lineExclude) {
-            if (!empty($row['file']) && strpos($row['file'], $lineExclude)!==false)
+            if (!empty($row['file']) && strpos($row['file'], $lineExclude) !== false)
                 return true;
             //            if (!empty($row['class']) && strpos($row['class'], $lineExclude)!==false)
             //                return true;
         }
-        if (!empty($row['file']) && strpos($row['file'], 'phperrorcatcher')!==false)
+        if (!empty($row['file']) && strpos($row['file'], 'phperrorcatcher') !== false)
             return true;
         return false;
     }
@@ -546,32 +566,39 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     /*****************************************************/
     /*****************************************************/
 
-    public static function addGlobalTag($tag) {
+    public static function addGlobalTag($tag)
+    {
         self::init()->logTags[] = $tag;
     }
 
-    public static function addGlobalTags(array $tags) {
+    public static function addGlobalTags(array $tags)
+    {
         self::init()->logTags = array_merge(self::init()->logTags, $tags);
     }
 
-    public static function addGlobalField($key, $val) {
+    public static function addGlobalField($key, $val)
+    {
         self::init()->logFields[$key] = $val;
     }
 
 
-    public static function setViewAlert($mess) {
+    public static function setViewAlert($mess)
+    {
         self::$_viewAlert[] = $mess;
     }
 
-    public static function getErrCount() {
+    public static function getErrCount()
+    {
         return static::$_obj->_errCount;
     }
 
-    public static function startCatchLog() {
+    public static function startCatchLog()
+    {
         self::$_userCatchLogFlag = true;
     }
 
-    public static function flushCatchLog() {
+    public static function flushCatchLog()
+    {
         // TODO
         //        $log = '';//self::init()->getRenderLogs();
         //        try {
@@ -585,7 +612,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         //        return $log;
     }
 
-    public static function getRenderLogs() {
+    public static function getRenderLogs()
+    {
         $logger = self::init();
         return $logger->getViewer()
             ->renderAllLogs(storage\FileStorage::getDataHttp(), $logger->getDataLogsGenerator());
@@ -596,12 +624,14 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * Профилирование алгоритмов и функций отдельно
      * @param null $timeOut
      */
-    public static function funcStart($timeOut) {
+    public static function funcStart($timeOut)
+    {
         static::$_functionStartTime = microtime(true);
         static::$_functionTimeOut = $timeOut;
     }
 
-    public static function funcEnd($name, $info = null, $simple = true) {
+    public static function funcEnd($name, $info = null, $simple = true)
+    {
         // TODO
         $timer = (microtime(true) - static::$_functionStartTime) * 1000;
         if (static::$_functionTimeOut && $timer < static::$_functionTimeOut) {
@@ -611,7 +641,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
     }
 
     protected static $tick;
-    public static function tickTrace($slice = 1, $limit = 3) {
+
+    public static function tickTrace($slice = 1, $limit = 3)
+    {
         // TODO
         self::$tick = array_slice(debug_backtrace(), $slice, $limit);
     }
@@ -621,7 +653,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param $value string
      * @return string
      */
-    public static function _e($value) {
+    public static function _e($value)
+    {
         if (!is_string($value)) {
             $value = self::safe_json_encode($value, JSON_UNESCAPED_UNICODE);
         }
@@ -632,23 +665,24 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param $arg
      * @return array|string
      */
-    public static function arrayToLower($arg) {
+    public static function arrayToLower($arg)
+    {
         if (is_array($arg)) {
             $arg = array_map('mb_strtolower', $arg);
             $arg = array_change_key_case($arg, CASE_LOWER);
             return $arg;
-        }
-        else {
+        } else {
             return mb_strtolower($arg);
         }
     }
 
-    public static function renderDebugArray($arr, $arrLen = 6, $strLen = 1024) {
+    public static function renderDebugArray($arr, $arrLen = 6, $strLen = 1024)
+    {
         if (!is_array($arr)) return $arr;
         $i = $arrLen;
         $args = [];
         foreach ($arr as $v) {
-            if ($i==0) {
+            if ($i == 0) {
                 $args[] = '...' . (count($arr) - 6) . ']';
                 break;
             }
@@ -666,10 +700,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
                 $args[] = $v;
             else if (is_string($v)) {
                 if (mb_strlen($v) > $strLen)
-                    $v = mb_substr($v, 0, $strLen).'...';
-                $args[] = '"'.preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '],$v).'"';
-            }
-            else {
+                    $v = mb_substr($v, 0, $strLen) . '...';
+                $args[] = '"' . preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '], $v) . '"';
+            } else {
                 $args[] = 'OVER';
             }
             $i--;
@@ -679,7 +712,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     /***************************************************/
 
-    public function setSafeParams() {
+    public function setSafeParams()
+    {
         if ($this->_postData !== null) return;
         $this->_postData = [];
 
@@ -727,13 +761,14 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param string $lineExclude
      * @return string
      */
-    public function renderDebugTrace($trace = null, $start = 0, $limit = 10, $lineExclude = '') {
+    public function renderDebugTrace($trace = null, $start = 0, $limit = 10, $lineExclude = '')
+    {
         if (is_string($trace)) return $trace;
         if (!$trace) $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $limit + 3);
         $res = '';
 
-        foreach ($trace as $i=>$row) {
-            if ($i<$start) continue;
+        foreach ($trace as $i => $row) {
+            if ($i < $start) continue;
             if (is_array($row) && (!empty($row['file']) || !empty($row['function']))) {
                 if (self::checkTraceExclude($row, $lineExclude)) continue;
                 $args = '';
@@ -743,38 +778,41 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
                 $res .= '#' . $i . ' ' . (!empty($row['file']) ? $this->getRelativeFilePath($row['file']) . ':' . $row['line'] . ' ' : '')
                     . (!empty($row['class']) ? $row['class'] . '::' : '')
                     . (!empty($row['function']) ? $row['function'] . '(' . $args . ')' : '') . PHP_EOL;
+            } else {
+                $res .= mb_substr('@ ' . (is_string($row) ? $row : json_encode($row, JSON_UNESCAPED_UNICODE)), 0, 1024) . PHP_EOL;
             }
-            else {
-                $res .= mb_substr('@ '.(is_string($row) ? $row : json_encode($row, JSON_UNESCAPED_UNICODE)), 0, 1024).PHP_EOL;
-            }
-            if ($i>=$limit) break;
+            if ($i >= $limit) break;
         }
         return $res;
     }
 
 
-    public function getFileLineByTrace($start = 2, $lineExclude = null) {
+    public function getFileLineByTrace($start = 2, $lineExclude = null)
+    {
         $res = '';
         foreach (array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 6), $start) as $row) {
             if (self::checkTraceExclude($row, $lineExclude))
                 continue;
             if (!empty($row['file']))
                 return $this->getRelativeFilePath($row['file']) . ':' . $row['line'];
-            return  (!empty($row['class']) ? $row['class'] . '::' : '')
+            return (!empty($row['class']) ? $row['class'] . '::' : '')
                 . (!empty($row['function']) ? $row['function'] . '()' : '');
         }
         return '-';
     }
 
-    public function getRelativeFilePath($file) {
+    public function getRelativeFilePath($file)
+    {
         return str_replace($this->dirRoot, '.', $file);
     }
 
-    public function getRawLogFile() {
-        return $this->dirRoot.'/raw.'.storage\FileStorage::FILE_EXT;
+    public function getRawLogFile()
+    {
+        return $this->dirRoot . '/raw.' . storage\FileStorage::FILE_EXT;
     }
 
-    public static function renderVars($vars, $sl = 0) {
+    public static function renderVars($vars, $sl = 0)
+    {
         $limitString = static::init()->get('limitString');
         $slr = str_repeat("\t", $sl);
         if (is_object($vars)) {
@@ -812,15 +850,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             //                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
             //                elseif (!is_string($vars)) $vars = 'ARRAY: '.static::_e(var_export($vars, true));
 
-        }
-        elseif (is_resource($vars)) {
+        } elseif (is_resource($vars)) {
             $vars = 'RESOURCE: ' . get_resource_type($vars);
 
-        }
-        elseif (null === $vars) {
+        } elseif (null === $vars) {
             $vars = 'NULL';
-        }
-        elseif (!is_int($vars)) {
+        } elseif (!is_int($vars)) {
             $vars = gettype($vars) . ': "' . static::_e(var_export($vars, true)) . '"';
         }
         $vars .= PHP_EOL;
@@ -828,11 +863,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         return $slr . $vars;
     }
 
-    public function getLogDataFromMemcache($key) {
+    public function getLogDataFromMemcache($key)
+    {
         $raw = json_decode($this->memcache()->get($key), true);
         $logData = new LogData;
         if (!is_array($raw)) {
-            echo 'LOG: '.$this->memcache()->get($key).PHP_EOL;
+            echo 'LOG: ' . $this->memcache()->get($key) . PHP_EOL;
             return null;
         }
         foreach ($raw as $prop => $val) {
@@ -843,58 +879,69 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
     /***************************************************/
 
-    public function emergency($message, array $tags = array(), array $fields = array()) {
+    public function emergency($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_CRITICAL;
         $tags[] = 'emergency';
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function alert($message, array $tags = array(), array $fields = array()) {
+    public function alert($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_CRITICAL;
         $tags[] = 'alert';
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function critical($message, array $tags = array(), array $fields = array()) {
+    public function critical($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_CRITICAL;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function error($message, array $tags = array(), array $fields = array()) {
+    public function error($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_ERROR;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function warning($message, array $tags = array(), array $fields = array()) {
+    public function warning($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_WARNING;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function notice($message, array $tags = array(), array $fields = array()) {
+    public function notice($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_NOTICE;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function info($message, array $tags = array(), array $fields = array()) {
+    public function info($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_INFO;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function debug($message, array $tags = array(), array $fields = array()) {
+    public function debug($message, array $tags = array(), array $fields = array())
+    {
         $level = self::LEVEL_DEBUG;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public static function logger($level, $message, $tags = array(), array $fields = array()) {
+    public static function logger($level, $message, $tags = array(), array $fields = array())
+    {
         return static::init()->log($level, $message, $tags, $fields);
     }
 
     protected static $_byteMemoryLimit;
-    public static function isMemoryOver() {
+
+    public static function isMemoryOver()
+    {
         $limitMemory = ini_get('memory_limit');
         if ($limitMemory > 0) {
             if (!self::$_byteMemoryLimit)
-                self::$_byteMemoryLimit =  (int) $limitMemory * (strpos($limitMemory, 'K') ? 1024 : (strpos($limitMemory, 'M') ? 1024 * 1024 : (strpos($limitMemory, 'G') ? 1024 * 1024 * 1024 : 1))) * 0.9;
+                self::$_byteMemoryLimit = (int)$limitMemory * (strpos($limitMemory, 'K') ? 1024 : (strpos($limitMemory, 'M') ? 1024 * 1024 : (strpos($limitMemory, 'G') ? 1024 * 1024 * 1024 : 1))) * 0.9;
             return memory_get_usage() >= self::$_byteMemoryLimit;
         }
         return false;
@@ -907,11 +954,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
      * @param string $level
      * @return bool
      */
-    public function log($level, $msg, array $tags = array(), array $fields = array()) {
+    public function log($level, $msg, array $tags = array(), array $fields = array())
+    {
         if (!isset($fields[self::FIELD_LOG_TYPE])) $fields[self::FIELD_LOG_TYPE] = self::TYPE_LOGGER;
 
         if (count($this->ignoreRules)) {
-            foreach($this->ignoreRules as $rule) {
+            foreach ($this->ignoreRules as $rule) {
                 $i = count($rule);
                 if (!empty($rule['level']) && $rule['level'] == $level) $i--;
                 if (!empty($rule['type']) && $rule['type'] == $fields[self::FIELD_LOG_TYPE]) $i--;
@@ -928,8 +976,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         if ($this->_count == 1000) {
             //TODO: cli print
             echo '<p>To many Logs</p>';
-        }
-        elseif ($this->_count > 100) {
+        } elseif ($this->_count > 100) {
             // TODO: print in cli mode
             return;
         }
@@ -940,10 +987,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
         if (is_object($msg)) {
             // если это эксепшн и другие подобные объекты
-            [$msg, $fields2] = $this->getLogFromObject($msg);
+            list($msg, $fields2) = $this->getLogFromObject($msg);
             if ($fields2) $fields = array_merge($fields, $fields2);
-        }
-        elseif (!is_string($msg)) {
+        } elseif (!is_string($msg)) {
             $msg = static::renderVars($msg);
         }
 
@@ -963,8 +1009,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
             array_push($tags, $_COOKIE[$this->logCookieKey]);
         }
 
-        if (isset($this->logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE]) ) {
-            $logData->trace = $this->renderDebugTrace(isset($fields[self::FIELD_TRICE]) ? $fields[self::FIELD_TRICE] : null , 0, (int) $this->logTraceByLevel[$level]);
+        if (isset($this->logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE])) {
+            $logData->trace = $this->renderDebugTrace(isset($fields[self::FIELD_TRICE]) ? $fields[self::FIELD_TRICE] : null, 0, (int)$this->logTraceByLevel[$level]);
         }
 
         if (isset($fields[self::FIELD_NO_TRICE]))
@@ -986,15 +1032,16 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
 
         $logData->tags = array_values(array_unique(self::arrayToLower($tags)));
         $logData->fields = $fields;
-        $logData->timestamp = (int) (microtime(true) * 1000);
-        $logData->logKey = 'phpeErCh_'.$this->getSessionKey().'_'.md5($logData->message.$logData->file);
+        $logData->timestamp = (int)(microtime(true) * 1000);
+        $logData->logKey = 'phpeErCh_' . $this->getSessionKey() . '_' . md5($logData->message . $logData->file);
 
         $this->add($logData);
 
         return true;
     }
 
-    static function safe_json_encode($value, $options = 0, $depth = 512) {
+    static function safe_json_encode($value, $options = 0, $depth = 512)
+    {
         $encoded = json_encode($value, $options, $depth);
         switch (json_last_error()) {
             case JSON_ERROR_NONE:
@@ -1014,19 +1061,21 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface {
         }
     }
 
-    static function utf8ize($mixed) {
+    static function utf8ize($mixed)
+    {
         if (is_array($mixed)) {
             foreach ($mixed as $key => $value) {
                 $mixed[$key] = self::utf8ize($value);
             }
-        } else if (is_string ($mixed)) {
+        } else if (is_string($mixed)) {
             $mixed = mb_convert_encoding($mixed, 'UTF-8');
         }
         return $mixed;
     }
 }
 
-class LogData {
+class LogData
+{
     public $logKey;
     public $message;
     public $level;
@@ -1038,16 +1087,18 @@ class LogData {
     public $timestamp;
     public $count = 1;
 
-    public function __toString() {
+    public function __toString()
+    {
         $data = [];
-        foreach (get_object_vars($this) as $k=>$v) {
+        foreach (get_object_vars($this) as $k => $v) {
             $data[$k] = $v;
         }
         return PHPErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE);
     }
 }
 
-class HttpData {
+class HttpData
+{
     public $ip_addr;
     public $host;
     public $method;

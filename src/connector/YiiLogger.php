@@ -14,7 +14,8 @@ use \xakki\phperrorcatcher\PHPErrorCatcher;
  *    Yii::$container->set('yii\log\Logger', '\xakki\phperrorcatcher\connector\YiiLogger');
  *    $config['bootstrap'][] = 'log';
  */
-class YiiLogger extends \yii\log\Logger {
+class YiiLogger extends \yii\log\Logger
+{
     public $targets = [];
     static $toMylevels = [
         self::LEVEL_ERROR => PHPErrorCatcher::LEVEL_ERROR,
@@ -23,7 +24,8 @@ class YiiLogger extends \yii\log\Logger {
         self::LEVEL_TRACE => PHPErrorCatcher::LEVEL_DEBUG,
     ];
 
-    public function log($message, $level, $category = '') {
+    public function log($message, $level, $category = '')
+    {
         if (isset(self::$toMylevels[$level])) {
             return PHPErrorCatcher::logger(self::$toMylevels[$level], $message, [], ['category' => $category]);
         }

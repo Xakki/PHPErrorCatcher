@@ -2,10 +2,13 @@
 
 namespace xakki\phperrorcatcher\storage;
 
-class PdoStorage extends BaseStorage {
+use PDO;
+
+class PdoStorage extends BaseStorage
+{
 
     /**
-     * @var null|array|callback|\PDO
+     * @var null|array|callback|PDO
      */
     protected $pdo = null;
     protected $pdoTableName = '_myprof';
@@ -13,9 +16,10 @@ class PdoStorage extends BaseStorage {
 
     /**
      * Получаем PDO соединение с БД
-     * @return \PDO|null
+     * @return PDO|null
      */
-    public function getPdo() {
+    public function getPdo()
+    {
         if ($this->pdo && is_array($this->pdo)) {
             $this->pdo = array_merge([
                 'engine' => 'mysql',
@@ -26,15 +30,16 @@ class PdoStorage extends BaseStorage {
                 'passwd' => 'test',
                 'options' => [],
             ], $this->pdo);
-            $this->pdo = new \PDO($this->pdo['engine'] . ':host=' . $this->pdo['host'] . ';port=' . $this->pdo['port'] . ';dbname=' . $this->pdo['dbname'], $this->pdo['username'], $this->pdo['passwd'], $this->pdo['options']);
+            $this->pdo = new PDO($this->pdo['engine'] . ':host=' . $this->pdo['host'] . ';port=' . $this->pdo['port'] . ';dbname=' . $this->pdo['dbname'], $this->pdo['username'], $this->pdo['passwd'], $this->pdo['options']);
         } elseif ($this->pdo && is_callable($this->pdo)) {
             $this->pdo = call_user_func_array($this->pdo, []);
         }
-        return ($this->pdo instanceof \PDO ? $this->pdo : null);
+        return ($this->pdo instanceof PDO ? $this->pdo : null);
     }
 
 
-    public function viewRenderBD($flag = false) {
+    public function viewRenderBD($flag = false)
+    {
         $fields = [
             'id' => [
                 'ID',
@@ -119,7 +124,7 @@ class PdoStorage extends BaseStorage {
             }
             return '<p class="alert alert-danger">' . $err[1] . ': ' . $err[2] . '</p>';
         }
-        $counts = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $counts = $stmt->fetch(PDO::FETCH_ASSOC);
         $counts = $counts['cnt'];
         // значение максимальной страницы
         $max_page = ceil($counts / $itemsOnPage);
@@ -182,7 +187,7 @@ class PdoStorage extends BaseStorage {
 
         $stmt = $this->owner->getPdo()->prepare($query);
         $stmt->execute();
-        $dataList = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $dataList = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $html = '';
 
@@ -324,7 +329,8 @@ class PdoStorage extends BaseStorage {
     /******************************************************************************************/
 
 
-    private function createDB() {
+    private function createDB()
+    {
         $sql = 'CREATE TABLE `' . $this->owner->get('pdoTableName') . '` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
