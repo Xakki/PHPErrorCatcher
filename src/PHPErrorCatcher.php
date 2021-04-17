@@ -7,7 +7,7 @@ error_reporting(E_ALL);
 
 class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 {
-    const VERSION = '0.4.11';
+    const VERSION = '0.5.0';
 
     const LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
