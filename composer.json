@@ -1,6 +1,6 @@
 {
   "name": "xakki/phperrorcatcher",
-  "version": "0.4.8",
+  "version": "0.5.0",
   "description": "Logger all error in file for PHP",
   "type": "library",
   "minimum-stability": "dev",
@@ -21,8 +21,7 @@
     "psr/log": "^1.0"
   },
   "require-dev": {
-    "lox/xhprof": "dev-master",
-    "phpmailer/phpmailer": "6.*"
+    "lox/xhprof": "dev-master"
   },
   "autoload": {
     "psr-4": {

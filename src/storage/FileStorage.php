@@ -79,18 +79,17 @@ class FileStorage extends BaseStorage
 
     /**
      * @param Generator|LogData[] $logData
+     * @return bool
      */
     private function putData($fileLog)
     {
         $lastSlash = strrpos($this->tplPath, '/');
         $fileName = strftime(substr($this->tplPath, 0, $lastSlash));
 
-        $fileName = $this->logPath . $this->logDir . '/' . $fileName;
+        $fileName = rtrim($this->logPath, '/') . '/'.trim($this->logDir, '/') . '/' . $fileName;
 
         if (!file_exists($fileName)) {
-            $oldUmask = umask(0);
-            mkdir($fileName, 0775, true);
-            umask($oldUmask);
+            $this->mkdir($fileName);
         }
 //\xakki\phperrorcatcher\PHPErrorCatcher::FIELD_LOG_NAME
         $fileName = $fileName . '/' . strftime(substr($this->tplPath, $lastSlash));

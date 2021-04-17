@@ -10,7 +10,8 @@ class ElasticStorage extends BaseStorage
 {
 
     protected $index = 'phplogs';
-    protected $url = 'http://localhost:9200';
+    protected $url = '';//http://localhost:9200
+    protected $file = null; //'/var/log/app.log'    // OR fo filebeat
     protected $auth = ''; // user:pass
 
     function __destruct()
@@ -23,13 +24,35 @@ class ElasticStorage extends BaseStorage
         }
     }
 
+    public function getViewMenu()
+    {
+        $menu = [];
+        if ($this->url)
+            $menu['IndexMapping'] = 'Elastic Mapping';
+        return $menu;
+    }
+
     /**
      * @param Generator|LogData[] $logData
+     * @return bool
      */
     protected function putData($logsData, $serverData)
     {
+        if ($this->file && substr($this->file, 0, 1) == '/') {
+            if (!$this->mkdir(dirname($this->file))) {
+                return false;
+            }
+            foreach ($logsData as $key => $logData) {
+                file_put_contents($this->file,
+                    PHPErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND);
+            }
+            return true;
+        }
+
+        if (!$this->url) return false;
+
         $data = [];
-        $meta = json_encode(['index' => ["_index" => $this->index]]);
+        $meta = json_encode(['index' => ["_index" => $this->index.'-'.date('Y-m')]]);
 //        $meta = '{"index":{}}';
         foreach ($logsData as $key => $logData) {
             $data[] = $meta;
@@ -87,128 +110,143 @@ class ElasticStorage extends BaseStorage
         return $data;
     }
 
-    protected function initLogIndex()
+    public function actionIndexMapping()
     {
         $data = [
-            "settings" => ['number_of_shards' => 1],
-            "mappings" => [
-                "_meta" => [
-                    "beat" => "PHPErrorCatcher",
-                    "version" => "0.3" // \xakki\phperrorcatcher\PHPErrorCatcher::VERSION
+            'version' => 1,
+            'priority' => 1,
+            '_meta' => [
+                'description' => 'PhpErrorCatcher v'.PHPErrorCatcher::VERSION
+            ],
+            "index_patterns" => [$this->index.'-*'],
+            'template' => [
+                'settings' => [
+                    'index' => [
+//                        'lifecycle' => ['name' => 'logs'],
+                        'refresh_interval' => '5s',
+                        'query' => [
+                            'default_field' => ['message']
+                        ]
+                    ]
                 ],
-                "dynamic_templates" => [
-                    [
-                        "fields" => [
-                            "path_match" => "fields.*",
-                            "match_mapping_type" => "string",
-                            "mapping" => [
-                                "type" => "keyword"
-                            ]
-                        ]
-                    ],
-                ],
-                'properties' => [
-                    "@timestamp" => [
-                        "type" => "date"
-                    ],
-                    'level' => ['type' => 'keyword'],
-                    'type' => ['type' => 'keyword'],
-                    "file" => [
-                        "type" => "text",
-                        "norms" => false,
-                    ],
-                    "fields" => [
-                        "properties" => [
-                            "env" => [
-                                "type" => "keyword"
-                            ]
-                        ]
-                    ],
-                    "tags" => [
-                        "type" => "keyword",
-                        'boost' => 2
-                    ],
-                    "http" => [
-                        "properties" => [
-                            "ip_addr" => [
-                                "type" => "ip"
-                            ],
-                            "host" => [
-                                "type" => "keyword",
-                                "ignore_above" => 128
-                            ],
-                            "method" => [
-                                "type" => "keyword",
-                                "ignore_above" => 8
-                            ],
-                            "url" => [
-                                "type" => "keyword",
-                                "ignore_above" => 1024
-                            ],
-                            "referrer" => [
-                                "type" => "keyword",
-                                "ignore_above" => 1024
-                            ],
-                            "scheme" => [
-                                "type" => "keyword",
-                                "ignore_above" => 8
-                            ]
-                        ]
-                    ],
-                    'user_agent' => [
-                        'properties' => [
-                            "device" => [
-                                "type" => "keyword",
-                                "ignore_above" => 32
-                            ],
-                            "name" => [
-                                "type" => "keyword",
-                                "ignore_above" => 32
-                            ],
-                            "original" => [
-                                "type" => "keyword",
-                                "ignore_above" => 256,
-                                'index' => false
-                            ],
-                            "os" => [
-                                "properties" => [
-                                    "full" => [
-                                        "type" => "keyword",
-                                        "ignore_above" => 32,
-                                        'index' => false
-                                    ],
-                                    "name" => [
-                                        "type" => "keyword",
-                                        "ignore_above" => 16
-                                    ],
-                                    "version" => [
-                                        "type" => "keyword",
-                                        "ignore_above" => 8
-                                    ]
+                "mappings" => [
+                    "dynamic_templates" => [
+                        [
+                            "fields" => [
+                                "path_match" => "fields.*",
+                                "match_mapping_type" => "string",
+                                "mapping" => [
+                                    "type" => "keyword"
                                 ]
-                            ],
-                            "version" => [
-                                "type" => "keyword",
-                                "ignore_above" => 32
                             ]
-                        ]
+                        ],
                     ],
-                    "message" => [
-                        "type" => "text",
-                        "norms" => false,
-                    ],
-                    "trace" => [
-                        "type" => "text",
-                        "norms" => false,
-                        'index' => false
-                    ],
-                    "count" => [
-                        "type" => "integer",
-                    ],
+                    'properties' => [
+                        "@timestamp" => [
+                            "type" => "date"
+                        ],
+                        'level' => ['type' => 'keyword'],
+                        'type' => ['type' => 'keyword'],
+                        "file" => [
+                            "type" => "text",
+                            "norms" => false,
+                        ],
+                        "fields" => [
+                            "properties" => [
+                                "env" => [
+                                    "type" => "keyword"
+                                ]
+                            ]
+                        ],
+                        "tags" => [
+                            "type" => "keyword",
+                            'boost' => 2
+                        ],
+                        "http" => [
+                            "properties" => [
+                                "ip_addr" => [
+                                    "type" => "ip"
+                                ],
+                                "host" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 128
+                                ],
+                                "method" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 8
+                                ],
+                                "url" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 1024
+                                ],
+                                "referrer" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 1024
+                                ],
+                                "scheme" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 8
+                                ]
+                            ]
+                        ],
+                        'user_agent' => [
+                            'properties' => [
+                                "device" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 32
+                                ],
+                                "name" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 32
+                                ],
+                                "original" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 256,
+                                    'index' => false
+                                ],
+                                "os" => [
+                                    "properties" => [
+                                        "full" => [
+                                            "type" => "keyword",
+                                            "ignore_above" => 32,
+                                            'index' => false
+                                        ],
+                                        "name" => [
+                                            "type" => "keyword",
+                                            "ignore_above" => 16
+                                        ],
+                                        "version" => [
+                                            "type" => "keyword",
+                                            "ignore_above" => 8
+                                        ]
+                                    ]
+                                ],
+                                "version" => [
+                                    "type" => "keyword",
+                                    "ignore_above" => 32
+                                ]
+                            ]
+                        ],
+                        "message" => [
+                            "type" => "text",
+                            "norms" => false,
+                        ],
+                        "trace" => [
+                            "type" => "text",
+                            "norms" => false,
+                            'index' => false
+                        ],
+                        "count" => [
+                            "type" => "integer",
+                        ],
+                    ]
                 ]
             ]
         ];
-        $this->sendDataToElastic($data, $this->url . '/' . $this->index, 'PUT');
+        if($this->sendDataToElastic($data, $this->url . '/_index_template/phplogs', 'PUT'))
+            return 'Success update mapping';
+        else
+            return 'Error update mapping';
     }
 
     protected function sendDataToElastic($data, $url, $method)
@@ -265,6 +303,7 @@ class ElasticStorage extends BaseStorage
             if ($this->_owner->get('debugMode')) {
                 print_r('<pre>');
                 print_r($text);
+                print_r(json_decode($text, true));
                 print_r($info);
                 print_r('</pre>');
             }

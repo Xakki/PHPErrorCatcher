@@ -259,6 +259,11 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         return (isset($this->_storages[$class]) ? $this->_storages[$class] : null);
     }
 
+    public function getStorages()
+    {
+        return $this->_storages;
+    }
+
     /**
      * @return \Generator|LogData[]
      * @throws \Exception
@@ -485,10 +490,10 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
             try {
                 if ($this->ifStopRules($logData)) {
                     // TODO: option & cli print
-                    echo PHP_EOL;
-                    print_r($logData);
-                    echo PHP_EOL;
-                    exit('****');
+//                    echo PHP_EOL;
+//                    print_r($logData);
+//                    echo PHP_EOL;
+                    exit('Fatal');
                 }
 
                 $str = $logData->__toString();
@@ -676,34 +681,40 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         }
     }
 
-    public static function renderDebugArray($arr, $arrLen = 6, $strLen = 1024)
+    public static function renderDebugArray($arr, $arrLen = 6, $strLen = 256)
     {
         if (!is_array($arr)) return $arr;
         $i = $arrLen;
         $args = [];
-        foreach ($arr as $v) {
+
+        foreach ($arr as $k => $v) {
             if ($i == 0) {
                 $args[] = '...' . (count($arr) - 6) . ']';
                 break;
             }
+            $prf = '';
+            if (!is_numeric($k))
+                $prf = $k.':';
             if (is_null($v))
-                $args[] = 'NULL';
+                $args[] = $prf.'NULL';
             else if (is_array($v))
-                $args[] = '[' . implode(', ', self::renderDebugArray($v, $arrLen, $strLen)) . ']';
+                $args[] = $prf.'[' . implode(', ', self::renderDebugArray($v, $arrLen, $strLen)) . ']';
             else if (is_object($v))
-                $args[] = get_class($v);
+                $args[] = $prf.get_class($v);
             else if (is_bool($v))
-                $args[] = ($v ? 'T' : 'F');
+                $args[] = $prf.($v ? 'T' : 'F');
             else if (is_resource($v))
-                $args[] = 'RESOURCE';
+                $args[] = $prf.'RESOURCE';
             else if (is_numeric($v))
-                $args[] = $v;
+                $args[] = $prf.$v;
             else if (is_string($v)) {
-                if (mb_strlen($v) > $strLen)
-                    $v = mb_substr($v, 0, $strLen) . '...';
-                $args[] = '"' . preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '], $v) . '"';
+                $l = mb_strlen($v);
+                if ($l > $strLen) {
+                    $v = mb_substr($v, 0, $strLen - 30) . '...('.$l.')...'.mb_substr($v, $l - 20);
+                }
+                $args[] = $prf.'"' . preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '], $v) . '"';
             } else {
-                $args[] = 'OVER';
+                $args[] = $prf.'OVER';
             }
             $i--;
         }

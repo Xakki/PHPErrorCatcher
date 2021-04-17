@@ -7,7 +7,10 @@ use xakki\phperrorcatcher\PHPErrorCatcher;
 
 abstract class BaseStorage extends Base
 {
-
+    public function getViewMenu()
+    {
+        return [];
+    }
 //    function __construct(PHPErrorCatcher $owner, $config = []) {
 //        parent::__construct($owner, $config);
 //

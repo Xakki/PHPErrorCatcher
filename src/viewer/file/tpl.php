@@ -186,6 +186,12 @@ $tabs = [
     <?php if (file_exists($this->_owner->getRawLogFile())): ?>
         <li class="nav-item"><a class="text-danger nav-link<?=($file=='rawlog' ? ' active' : '')?>" href="<?=$home?>rawlog">Errors</a></li>
     <?php endif; ?>
+
+    <?php foreach ($this->_owner->getStorages() as $stClass => $st): ?>
+        <?php foreach ($st->getViewMenu() as $fName => $menuName): ?>
+            <li class="nav-item"><a class="text-danger nav-link<?=(($file=='storage' && $_GET['fname'] == $stClass.'/'.$fName)? ' active' : '')?>" href="<?=$home?>storage&fname=<?=$stClass.'/'.$fName?>"><?=$menuName?></a></li>
+        <?php endforeach; ?>
+    <?php endforeach; ?>
     <li class="nav-item"><a class="nav-link<?=($file == 'PHPINFO' ? ' active' : '')?>" href="<?=$home?>PHPINFO">PHPINFO</a></li>
     <li class="nav-item"><a class="nav-link" href="?" target="_blank">HOME</a></li>
     <li class="nav-item"><a class="nav-link">Core ver: <?=PHPErrorCatcher::VERSION?>. Viewer ver: <?=FileViewer::VERSION?></a></li>

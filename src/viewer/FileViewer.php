@@ -119,6 +119,15 @@ class FileViewer extends BaseViewer
             }
         } elseif ($file == 'PHPINFO') {
             phpinfo();
+        } elseif ($file == 'storage') {
+            list($st, $fn) = explode('/', $_GET['fname']);
+            echo '<p>';
+            if ($this->_owner->getStorage($st) && method_exists($this->_owner->getStorage($st), 'action'.$fn)) {
+                echo call_user_func([$this->_owner->getStorage($st), 'action'.$fn]);
+            } else {
+                echo 'No action call';
+            }
+            echo '</p>';
         } else {
             $file = $this->_fileStorage->getLogPath() . '/' . $file;
 
@@ -180,15 +189,14 @@ class FileViewer extends BaseViewer
     {
         $dirList1 = $dirList2 = [];
         $path = trim($path, '/.');
-        $fullPath = $this->_fileStorage->getLogPath() . ($path ? '/' . $path : '');
+        if ($path) $path = '/' . $path;
+        $fullPath = $this->_fileStorage->getLogPath() . $path;
 
         if (!file_exists($fullPath)) {
-            $oldUmask = umask(0);
-            if (!mkdir($fullPath, 0775, true)) {
+            if (!$this->mkdir($fullPath)) {
                 echo ' Cant create dir ' . $fullPath;
                 return [];
             }
-            umask($oldUmask);
         }
         $isBackUpDir = $this->checkIsBackUp($fullPath);
         $dir = dir($fullPath);
@@ -197,6 +205,7 @@ class FileViewer extends BaseViewer
         while (false !== ($entry = $dir->read())) {
             if ($entry != '.' && $entry != '..') {
                 $fileUrl = $homeUrl . $path . '/' . $entry;
+
                 $filePath = $fullPath . '/' . $entry;
 
 
@@ -299,9 +308,7 @@ class FileViewer extends BaseViewer
             $backUpFile = str_replace($this->_fileStorage->getLogPath(), $this->_fileStorage->getLogPath() . $this->_fileStorage->getBackUpDir(), $file);
             $backUpFileDir = dirname($backUpFile);
             if (!file_exists($backUpFileDir)) {
-                $oldUmask = umask(0);
-                mkdir($backUpFileDir, 0775, true);
-                umask($oldUmask);
+                $this->mkdir($backUpFileDir);
             }
 
             if (file_exists($backUpFile)) {
@@ -353,9 +360,7 @@ class FileViewer extends BaseViewer
             } else {
                 $parentDir = dirname($backUpFileDir);
                 if (!file_exists($parentDir)) {
-                    $oldUmask = umask(0);
-                    mkdir($parentDir, 0775, true);
-                    umask($oldUmask);
+                    $this->mkdir($parentDir);
                 }
             }
             rename($dir, $backUpFileDir);
@@ -373,15 +378,16 @@ class FileViewer extends BaseViewer
     private function renderViewBreadCrumb($url)
     {
         $temp = preg_split('/\//', $url, -1, PREG_SPLIT_NO_EMPTY);
-        $ctr = '';
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
         $basePath = $fullPath = $this->getHomeUrl('');
+        $ctr = '<li class="breadcrumb-item"><a href="' . $basePath . '">Home</a></li>';
         foreach ($temp as $r) {
             $fullPath .= '/' . $r;
-            $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . $r . '</a>';
+            $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . $r . '</a></li>';
         }
-        return '<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="' . $basePath . '">Home</a>' . $ctr . '</ol></nav>';
+
+        return '<nav aria-label="breadcrumb"><ol class="breadcrumb">' . $ctr . '</ol></nav>';
     }
 
     private function getPreviosUrl()

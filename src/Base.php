@@ -43,4 +43,17 @@ abstract class Base
             return null;
         }
     }
+
+    /**
+     * @param string $fileName
+     * @return bool
+     */
+    public function mkdir($fileName)
+    {
+        if (file_exists($fileName)) return true;
+        $oldUmask = umask(0);
+        $res = mkdir($fileName, 0775, true);
+        umask($oldUmask);
+        return $res;
+    }
 }
