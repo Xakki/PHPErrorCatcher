@@ -72,7 +72,7 @@ class FileStorage extends BaseStorage
             $data['scheme'] = $serverData['REQUEST_SCHEME'];
         if (!empty($serverData['HTTP_USER_AGENT']))
             $data['user_agent'] = substr($serverData['HTTP_USER_AGENT'], 0, 500);
-        if (PHPErrorCatcher::init()->get('_overMemory'))
+        if (PHPErrorCatcher::isMemoryOver())
             $data['overMemory'] = true;
         return $data;
     }

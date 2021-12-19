@@ -514,8 +514,9 @@ class FileViewer extends BaseViewer
      */
     public static function renderItemLog($logData)
     {
+        $dt = explode('.', (string) $logData->timestamp);
         $res = '<div class="bug_item bug_level_' . $logData->level . '">'
-            . '<span class="bug_time">' . date('H:i:s', (int)($logData->timestamp) / 1000) . '</span>'
+            . '<span class="bug_time">' . date('H:i:s', $dt[0]) . '.'.$dt[1].'</span>'
             . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '[' . $logData->count . ']' : '') . '</span>';
         //(isset($logData->fields[PHPErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PHPErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
         if ($logData->tags) {

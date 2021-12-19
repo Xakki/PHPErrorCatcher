@@ -274,7 +274,7 @@ class ElasticStorage extends BaseStorage
             $params[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
             $params[CURLOPT_USERPWD] = $this->auth;
         }
-        if ($this->_owner->get('debugMode')) {
+        if ($this->_owner->debugMode) {
             $params[CURLINFO_HEADER_OUT] = true;
             $params[CURLOPT_VERBOSE] = true;
 //            $params[CURLOPT_HEADER] = true;
@@ -300,7 +300,7 @@ class ElasticStorage extends BaseStorage
         }
 
         if ($isErr) {
-            if ($this->_owner->get('debugMode')) {
+            if ($this->_owner->debugMode) {
                 print_r('<pre>');
                 print_r($text);
                 print_r(json_decode($text, true));

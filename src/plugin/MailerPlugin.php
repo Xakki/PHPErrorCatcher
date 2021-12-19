@@ -61,7 +61,7 @@ class MailerPlugin extends BasePlugin
     public function shutdown()
     {
 
-        if ($this->_hasError || ($this->_allLogs && !$this->logOnlyIfError)) { // ($this->_allLogs || $this->_overMemory)
+        if ($this->_hasError || ($this->_allLogs && !$this->logOnlyIfError)) { // ($this->_allLogs )
             $fileLog = $this->renderLogs();
             $mailStatus = $errorMailLog = false;
             try {

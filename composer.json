@@ -1,6 +1,6 @@
 {
   "name": "xakki/phperrorcatcher",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "description": "Logger all error in file for PHP",
   "type": "library",
   "minimum-stability": "dev",
@@ -15,9 +15,10 @@
     "issues": "https://github.com/xakki/phperrorcatcher/issues"
   },
   "require": {
-    "php": ">=5.6",
+    "php": ">=8.0",
     "ext-memcached": "*",
     "ext-json": "*",
+    "ext-curl": "*",
     "psr/log": "^1.0"
   },
   "require-dev": {
