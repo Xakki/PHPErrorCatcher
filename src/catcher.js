@@ -12,6 +12,19 @@ window.onerror = function (msg, url, line, col, err) {
 	return false;
 };
 
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (key, value) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) {
+        return;
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
+
 //Exceptions
 function errorCatcher(msg, url, line, err) {
 	if (!navigator.userAgent) return;
@@ -41,7 +54,14 @@ function errorCatcher(msg, url, line, err) {
 	}
 
 	if (msg) {
-		if (typeof msg !== "string") msg = JSON.stringify(msg);
+		if (typeof msg !== "string") {
+		    try {
+		        msg = JSON.stringify(msg);
+		    } catch (e) {
+				console.error(e);
+				msg = '****';
+			}
+		}
 		msg = msg.replace(/\n/g, "||");
 		msg = msg.substr(0, 1600);
 	}

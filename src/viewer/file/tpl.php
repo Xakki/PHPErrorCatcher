@@ -149,6 +149,7 @@ $tabs = [
         }
 
         .bug_str {
+            white-space: pre-wrap;
         }
 
         .bug_vars .xsp-body,

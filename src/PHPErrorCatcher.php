@@ -10,9 +10,9 @@ if(!defined('STDERR')) define('STDERR', fopen('php://stderr', 'wb'));
 
 class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 {
-    const VERSION = '0.8.0';
+    public const VERSION = '0.8.1';
 
-    const LEVEL_DEBUG = 'debug',
+    public const LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
         LEVEL_INFO = 'info',
         LEVEL_NOTICE = 'notice',
@@ -20,18 +20,18 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         LEVEL_ERROR = 'error',
         LEVEL_CRITICAL = 'critical';
 
-    const TYPE_LOGGER = 'logger',
+    public const TYPE_LOGGER = 'logger',
         TYPE_TRIGGER = 'trigger',
         TYPE_EXCEPTION = 'exception',
         TYPE_FATAL = 'fatal';
 
-    const FIELD_LOG_TYPE = 'log_type',
+    public const FIELD_LOG_TYPE = 'log_type',
         FIELD_FILE = 'file',
         FIELD_TRICE = 'trice',
         FIELD_NO_TRICE = 'trice_no_fake',
         FIELD_ERR_CODE = 'error_code';
 
-    protected static $triggerLevel = [
+    protected static array $triggerLevel = [
         E_ERROR => self::LEVEL_ERROR,
         E_WARNING => self::LEVEL_WARNING,
         E_PARSE => self::LEVEL_CRITICAL,
@@ -54,63 +54,57 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
     // Config
     /************************************/
 
-    public $debugMode = false;//ERROR_DEBUG_MODE
-    public $enableSessionLog = false;
+    public bool $debugMode = false;//ERROR_DEBUG_MODE
+    public bool $enableSessionLog = false;
 
-    protected $logTimeProfiler = false;// time execute log
-    protected $logCookieKey = '';
-    protected $dirRoot = '';
-    protected $limitTrace = 10;
-    protected $limitString = 1024;
-    protected $enableCookieLog = false;
-    protected $enablePostLog = true;
-    /**
-     * Callback Error
-     * @var null|callable
-     */
-    protected $errorCallback = null;
+    protected bool $logTimeProfiler = false;// time execute log
+    protected string $logCookieKey = '';
+    protected string $dirRoot = '';
+    protected int $limitTrace = 10;
+    protected int $limitString = 1024;
+    protected bool $enableCookieLog = false;
+    protected bool $enablePostLog = true;
 
     /**
      * Параметры(POST,SESSION,COOKIE) затираемы при записи в логи
-     * @var array
      */
-    protected $safeParamsKey = [
+    protected array $safeParamsKey = [
         'password',
         'input_password',
         'pass',
     ];
 
-    protected $logTraceByLevel = [
+    protected array $logTraceByLevel = [
         self::LEVEL_CRITICAL => 10, // trace deep level
         self::LEVEL_ERROR => 7,
         self::LEVEL_WARNING => 5,
     ];
 
-    protected $saveLogIfHasError = false;
-    protected $ignoreRules = [
+    protected bool $saveLogIfHasError = false;
+    protected array $ignoreRules = [
         //        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
     ];
-    protected $stopRules = [
+    protected array $stopRules = [
         //        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
     ];
     /**
      * @var array|\Memcached
      */
-    protected $memcacheServers = [
+    protected array $memcacheServers = [
         ['localhost', 11211],
     ];
-    protected $lifeTime = 600;//sec // ini_get('max_execution_time')
+    protected int $lifeTime = 600;//sec // ini_get('max_execution_time')
 
-    protected $logTags = [];
-    protected $logFields = [];
+    protected array $logTags = [];
+    protected array $logFields = [];
     /************************************/
     // Variable
     /************************************/
 
-    protected $_count = 0;
-    protected $_errCount = 0;
-    protected $_time_start = null;
-    protected $_time_end = null;
+    protected int $count = 0;
+    protected int $_errCount = 0;
+    protected int $_time_start = 0;
+    protected int $_time_end = 0;
 
     protected $_isViewMode = false;
     protected $_sessionKey = null;
@@ -642,14 +636,19 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
     /*****************************************************/
     /*****************************************************/
 
-    public static function addGlobalTag($tag)
+    public static function addGlobalTag(string $tag)
     {
+        if (mb_strlen($tag) > 32) {
+            $tag = mb_substr($tag, 32) . '...';
+        }
         self::init()->logTags[] = $tag;
     }
 
     public static function addGlobalTags(array $tags)
     {
-        self::init()->logTags = array_merge(self::init()->logTags, $tags);
+        foreach ($tags as $v) {
+            self::init()->addGlobalTag($v);
+        }
     }
 
     public static function addGlobalField($key, $val)
@@ -855,7 +854,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
                 if (self::checkTraceExclude($row, $lineExclude)) continue;
                 $args = '';
                 if (!empty($row['args'])) {
-                    $args = implode(', ', self::renderDebugArray($row['args']));
+                    $args = implode(', ', self::renderDebugArray($row['args'], $i > 0 ? 6 : 15, $i > 0 ? 255 : 5000));
                 }
                 $res .= '#' . $i . ' ' . (!empty($row['file']) ? $this->getRelativeFilePath($row['file']) . ':' . $row['line'] . ' ' : '')
                     . (!empty($row['class']) ? $row['class'] . '::' : '')
@@ -893,56 +892,99 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         return $this->dirRoot . '/raw.' . storage\FileStorage::FILE_EXT;
     }
 
-    public static function renderVars($vars, $sl = 0)
+    private static $objects = [];
+    
+    public static function renderVars($var, int $depth = 3, bool $highlight = false) {
+        return self::dumpAsString($var, $depth = 3);
+    }
+    
+    public static function dumpAsString($var, int $depth = 3, bool $highlight = false)
     {
-        $limitString = static::init()->limitString;
-        $slr = str_repeat("\t", $sl);
-        if (is_object($vars)) {
-            $vars = 'Object: ' . get_class($vars);
-
-        } elseif (is_string($vars)) {
-            $size = mb_strlen($vars, '8bit');
-            if ($size > $limitString) $vars = '"' . mb_substr(static::_e($vars), 0, $limitString) . '...(' . $size . 'b)"'; else $vars = '"' . static::_e($vars) . '"';
-
-        } elseif (is_array($vars)) {
-            if (isset($vars['_SERVER'])) return '';
-            $vv = '[' . PHP_EOL;
-            foreach ($vars as $k => $r) {
-                $vv .= $slr . "\t" . static::_e($k) . ' => ';
-                if (isset($GLOBALS[$k])) {
-                    $vv .= 'GLOBAL VAR';
-                } elseif (is_array($r)) {
-                    $vv .= static::renderVars($r, ($sl + 1));
-                } elseif (is_object($r)) {
-                    $vv .= 'Object: ' . get_class($r);
-                } elseif (is_string($r)) {
-                    $vv .= static::_e(mb_substr($r, 0, $limitString));
-                } elseif (is_resource($r)) {
-                    $vv .= 'Resource: ' . get_resource_type($r);
-                } elseif (is_int($r)) {
-                    $vv .= $r;
-                } else {
-                    $vv .= gettype($r) . ': "' . static::_e(var_export($r, true)) . '"';
-                }
-                $vv .= PHP_EOL;
-            }
-            $vv .= $slr . ']';
-            $vars = $vv;
-            //                $size = mb_strlen(json_encode($vars), '8bit');
-            //                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
-            //                elseif (!is_string($vars)) $vars = 'ARRAY: '.static::_e(var_export($vars, true));
-
-        } elseif (is_resource($vars)) {
-            $vars = 'RESOURCE: ' . get_resource_type($vars);
-
-        } elseif (null === $vars) {
-            $vars = 'NULL';
-        } elseif (!is_int($vars)) {
-            $vars = gettype($vars) . ': "' . static::_e(var_export($vars, true)) . '"';
+        $output = self::dumpInternal($var, $depth, 0);
+        if ($highlight) {
+            $result = highlight_string("<?php\n" . $output, true);
+            $output = preg_replace('/&lt;\\?php<br \\/>/', '', $result, 1);
         }
-        $vars .= PHP_EOL;
-
-        return $slr . $vars;
+        self::$objects = [];
+        return $output;
+    }
+    
+    private static function dumpInternal($var, int $depth, int $level = 0)
+    {
+        $output = '';
+        switch (gettype($var)) {
+            case 'boolean':
+                $output .= $var ? 'T' : 'F';
+                break;
+            case 'integer':
+            case 'double':
+                $output .= (string)$var;
+                break;
+            case 'string':
+                $limitString = static::init()->limitString;
+                $size = mb_strlen($var);
+                if ($size > $limitString) {
+                    $output = '"' . static::_e(mb_substr($var, 0, $limitString)) . '...(' . $size . 'b)"'; 
+                }
+                else {
+                    $output = '"' . static::_e($var) . '"';
+                }
+                break;
+            case 'resource':
+                $output .= '{resource}';
+                break;
+            case 'NULL':
+                $output .= 'null';
+                break;
+            case 'unknown type':
+                $output .= '{unknown}';
+                break;
+            case 'array':
+                if ($depth <= $level) {
+                    $output .= '[...]';
+                } elseif (empty($var)) {
+                    $output .= '[]';
+                } else {
+                    $spaces = str_repeat(' ', $level * 4);
+                    $output .= '[';
+                    foreach ($var as $key => $val) {
+                        $output .= "\n" . $spaces . '    ';
+                        $output .= self::dumpInternal($key, $depth, 0);
+                        $output .= ' => ';
+                        $output .= self::dumpInternal($val, $depth, $level + 1);
+                    }
+                    $output .= "\n" . $spaces . ']';
+                }
+                break;
+            case 'object':
+                $id = array_search($var, self::$objects, true);
+                if ($id !== false) {
+                    $output .= get_class($var) . '#' . ($id + 1) . '(...)';
+                } elseif ($depth <= $level) {
+                    $output .= get_class($var) . '(...)';
+                } else {
+                    $id = array_push(self::$objects, $var);
+                    $className = get_class($var);
+                    $spaces = str_repeat(' ', $level * 4);
+                    $output .= "$className#$id\n" . $spaces . '(';
+                    if ('__PHP_Incomplete_Class' !== get_class($var) && method_exists($var, '__debugInfo')) {
+                        $dumpValues = $var->__debugInfo();
+                        if (!is_array($dumpValues)) {
+                            throw new \Exception('__debuginfo() must return an array');
+                        }
+                    } else {
+                        $dumpValues = (array) $var;
+                    }
+                    foreach ($dumpValues as $key => $value) {
+                        $keyDisplay = strtr(trim($key), "\0", ':');
+                        $output .= "\n" . $spaces . "    [$keyDisplay] => ";
+                        $output .= self::dumpInternal($value, $depth, $level + 1);
+                    }
+                    $output .= "\n" . $spaces . ')';
+                }
+                break;
+        }
+        return $output;
     }
 
     public function getLogDataFromMemcache($key)
@@ -1054,12 +1096,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         if (isset(self::$_errorLevel[$level])) {
             $this->_errCount++;
         }
-        $this->_count++;
+        $this->count++;
 
-        if ($this->_count == 1000) {
+        if ($this->count == 1000) {
             //TODO: cli print
             echo '<p>To many Logs</p>';
-        } elseif ($this->_count > 100) {
+        } elseif ($this->count > 100) {
             // TODO: print in cli mode
             return;
         }
@@ -1069,17 +1111,33 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
             [$msg, $fields2] = $this->getLogFromObject($msg);
             if ($fields2) $fields = array_merge($fields, $fields2);
         } elseif (!is_string($msg)) {
-            $msg = static::renderVars($msg);
+            $msg = static::dumpAsString($msg);
         }
 
         $logData = new LogData;
         $logData->message = mb_substr($msg, 0, 5000);
         $logData->level = $level;
+        foreach ($tags as $k => $v) {
+            if (is_numeric($k)) {
+                $tags[$k] = (string) $v;
+                if (mb_strlen($tags[$k]) > 32) {
+                    $tags[$k] = mb_substr($tags[$k], 32) . '...';
+                }
+            } else {
+                $fields[$k] = $tags[$k];
+                unset($tags[$k]);
+            }
+        }
 
         if (count($this->logTags)) {
             $tags = array_merge($tags, $this->logTags);
         }
         if (count($this->logFields)) {
+            array_walk($fields, function (& $v) {
+                if (is_array($v) || is_object($v)) {
+                    $v = json_encode($v);
+                }
+            });
             $fields = array_merge($this->logFields, $fields);
         }
 

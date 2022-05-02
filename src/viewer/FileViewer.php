@@ -56,6 +56,8 @@ class FileViewer extends BaseViewer
 
     /* @var FileStorage */
     protected $_fileStorage;
+    
+    protected $idePath;
 
     function __construct(PHPErrorCatcher $owner, $config = [])
     {
@@ -129,7 +131,7 @@ class FileViewer extends BaseViewer
             }
             echo '</p>';
         } else {
-            $file = $this->_fileStorage->getLogPath() . '/' . $file;
+            $file = rtrim($this->_fileStorage->getLogPath(), '/') . '/' . $file;
 
             if ($file) {
                 if (!file_exists($file)) {
@@ -204,7 +206,7 @@ class FileViewer extends BaseViewer
 
         while (false !== ($entry = $dir->read())) {
             if ($entry != '.' && $entry != '..') {
-                $fileUrl = $homeUrl . $path . '/' . $entry;
+                $fileUrl = $homeUrl . urlencode($path . '/' . $entry);
 
                 $filePath = $fullPath . '/' . $entry;
 
@@ -430,6 +432,7 @@ class FileViewer extends BaseViewer
         // mime_content_type
         $pathinfo = pathinfo($file);
         $is_img = @getimagesize($file);
+        $pathinfo['extension'] = $pathinfo['extension'] ?? '';
         if ($is_img) {
             return '<br/><img src="' . $this->_owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
         } elseif ($pathinfo['extension'] == 'html' || isset($_GET['only'])) {
@@ -490,10 +493,11 @@ class FileViewer extends BaseViewer
         //            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
         //        }
         $html = '<div class="bugs">';
+        if (!empty($httpData->method))
+            $html .= '<span class="bugs_uri">' . $httpData->method .'</span> ';
         if (!empty($httpData->host))
-            $html .= '<span class="bugs_host">' . $httpData->host . '</span> ';
-        if (!empty($httpData->url))
-            $html .= '<span class="bugs_uri">' . $httpData->method . ' ' . $httpData->url . '</span> ';
+            $html .= '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
+
         if (!empty($httpData->ip_addr))
             $html .= '<span class="bugs_ip">' . $httpData->ip_addr . '</span> ';
         if (!empty($httpData->referrer))
@@ -512,7 +516,7 @@ class FileViewer extends BaseViewer
      * @param LogData $logData
      * @return string
      */
-    public static function renderItemLog($logData)
+    public function renderItemLog($logData)
     {
         $dt = explode('.', (string) $logData->timestamp);
         $res = '<div class="bug_item bug_level_' . $logData->level . '">'
@@ -520,21 +524,35 @@ class FileViewer extends BaseViewer
             . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '[' . $logData->count . ']' : '') . '</span>';
         //(isset($logData->fields[PHPErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PHPErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
         if ($logData->tags) {
+             array_walk($logData->tags, function (&$v) {
+                 if (!is_string($v)) $v = PHPErrorCatcher::dumpAsString($v);
+                 if (mb_strlen($v) > 32) {
+                    $v = mb_substr($v, 32) . '...';
+                 }
+                 $v = PHPErrorCatcher::_e($v);
+            });
             $res .= '<span class="bug_tags">[' . implode(', ', $logData->tags) . ']</span>';
         }
         if ($logData->fields) {
-            $res .= '<span class="bug_fields">' . PHPErrorCatcher::renderVars((array)$logData->fields) . '</span>';
+            $logData->fields = (array) $logData->fields;
+             array_walk($logData->fields, function (&$v) {
+                 if (!is_string($v)) $v = PHPErrorCatcher::dumpAsString($v);
+                if (mb_strlen($v) > 512) {
+                    $v = mb_substr($v, 512) . '...';
+                }
+            });
+            $res .= '<span class="bug_fields">' . json_encode($logData->fields) . '</span>';
         }
         if ($logData->file) {
             //        $debug .= '<div class="bug_file"> File <a href="file:/' . $errfile . ':' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
             $fl = explode(':', $logData->file);
-            $res .= '<span class="bug_file"> File <a href="idea://open?url=file://' . $fl[0] . '&line=' . $fl[1] . '">' . $logData->file . '</a></span>';
+            $res .= '<span class="bug_file"> File <a href="idea://open?url=file://' . $this->idePath . $fl[0] . '&line=' . $fl[1] . '">' . $logData->file . '</a></span>';
         }
         $res .= '<div class="bug_str">' . PHPErrorCatcher::_e($logData->message) . '</div>';
 
         if ($logData->trace) {
             $res .= '<div class="trace xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body pre">'
-                . $logData->trace
+                . PHPErrorCatcher::_e($logData->trace)
                 . '</div></div>';
         }
 

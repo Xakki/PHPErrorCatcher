@@ -21,7 +21,7 @@ class FileStorage extends BaseStorage
 {
     /* Config */
     protected $logPath = '';
-    protected $tplPath = '%Y.%m/%d';
+    protected $tplPath = 'Y.m/d';
     protected $logDir = '/logsError';
     protected $backUpDir = '/_backUp';
     protected $limitFileSize = 10485760;
@@ -84,7 +84,8 @@ class FileStorage extends BaseStorage
     private function putData($fileLog)
     {
         $lastSlash = strrpos($this->tplPath, '/');
-        $fileName = strftime(substr($this->tplPath, 0, $lastSlash));
+        $date = \DateTimeImmutable::createFromFormat('U', time());
+        $fileName = $date->format(substr($this->tplPath, 0, $lastSlash));
 
         $fileName = rtrim($this->logPath, '/') . '/'.trim($this->logDir, '/') . '/' . $fileName;
 
@@ -92,7 +93,7 @@ class FileStorage extends BaseStorage
             $this->mkdir($fileName);
         }
 //\xakki\phperrorcatcher\PHPErrorCatcher::FIELD_LOG_NAME
-        $fileName = $fileName . '/' . strftime(substr($this->tplPath, $lastSlash));
+        $fileName = $fileName . '/' . $date->format(substr($this->tplPath, $lastSlash));
         if ($this->_owner->getErrCount()) {
             $fileName .= '.err';
         }

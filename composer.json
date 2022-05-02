@@ -4,6 +4,7 @@
   "description": "Logger all error in file for PHP",
   "type": "library",
   "minimum-stability": "dev",
+  "prefer-stable": true,
   "license": "LGPL-2.1",
   "authors": [
     {
@@ -15,11 +16,11 @@
     "issues": "https://github.com/xakki/phperrorcatcher/issues"
   },
   "require": {
-    "php": ">=8.0",
+    "php": ">=8.1",
     "ext-memcached": "*",
     "ext-json": "*",
     "ext-curl": "*",
-    "psr/log": "^1.0"
+    "psr/log": "^3.0"
   },
   "require-dev": {
     "lox/xhprof": "dev-master"
