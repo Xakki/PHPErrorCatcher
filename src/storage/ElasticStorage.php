@@ -16,10 +16,10 @@ class ElasticStorage extends BaseStorage
 
     function __destruct()
     {
-        if ($this->_owner->needSaveLog()) {
+        if ($this->owner->needSaveLog()) {
 //            $this->initLogIndex();
-            if ($this->putData($this->_owner->getDataLogsGenerator(), $_SERVER)) {
-                $this->_owner->successSaveLog();
+            if ($this->putData($this->owner->getDataLogsGenerator(), $_SERVER)) {
+                $this->owner->successSaveLog();
             }
         }
     }
@@ -274,7 +274,7 @@ class ElasticStorage extends BaseStorage
             $params[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
             $params[CURLOPT_USERPWD] = $this->auth;
         }
-        if ($this->_owner->debugMode) {
+        if ($this->owner->debugMode) {
             $params[CURLINFO_HEADER_OUT] = true;
             $params[CURLOPT_VERBOSE] = true;
 //            $params[CURLOPT_HEADER] = true;
@@ -300,14 +300,14 @@ class ElasticStorage extends BaseStorage
         }
 
         if ($isErr) {
-            if ($this->_owner->debugMode) {
+            if ($this->owner->debugMode) {
                 print_r('<pre>');
                 print_r($text);
                 print_r(json_decode($text, true));
                 print_r($info);
                 print_r('</pre>');
             }
-            $this->_owner->error($text, ['elastic'], ['http_code' => $info['http_code'], ['trace' => []]]);
+            $this->owner->error($text, ['elastic'], ['http_code' => $info['http_code'], ['trace' => []]]);
             return false;
         }
         return true;

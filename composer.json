@@ -16,7 +16,7 @@
     "issues": "https://github.com/xakki/phperrorcatcher/issues"
   },
   "require": {
-    "php": ">=8.1",
+    "php": ">=8.0",
     "ext-memcached": "*",
     "ext-json": "*",
     "ext-curl": "*",

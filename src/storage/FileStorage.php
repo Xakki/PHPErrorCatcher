@@ -32,9 +32,9 @@ class FileStorage extends BaseStorage
     function __destruct()
     {
 
-        if ($this->_owner->needSaveLog()) {
-            if ($this->putData($this->_owner->getDataLogsGenerator())) {
-                $this->_owner->successSaveLog();
+        if ($this->owner->needSaveLog()) {
+            if ($this->putData($this->owner->getDataLogsGenerator())) {
+                $this->owner->successSaveLog();
             }
         }
     }
@@ -94,7 +94,7 @@ class FileStorage extends BaseStorage
         }
 //\xakki\phperrorcatcher\PHPErrorCatcher::FIELD_LOG_NAME
         $fileName = $fileName . '/' . $date->format(substr($this->tplPath, $lastSlash));
-        if ($this->_owner->getErrCount()) {
+        if ($this->owner->getErrCount()) {
             $fileName .= '.err';
         }
         $fileName .= '.' . self::FILE_EXT;

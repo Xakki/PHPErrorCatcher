@@ -108,13 +108,13 @@ class FileViewer extends BaseViewer
         //        }
         //        else
         if ($file == 'rawlog') {
-            if (file_exists($this->_owner->getRawLogFile())) {
+            if (file_exists($this->owner->getRawLogFile())) {
                 if (!empty($_GET['del'])) {
-                    unlink($this->_owner->getRawLogFile());
+                    unlink($this->owner->getRawLogFile());
                     echo '--empty--';
                 } else {
                     echo '<p><a href="' . $this->getHomeUrl('') . 'rawlog&del=1" class="linkDel">Удалить</a></p>';
-                    echo $this->renderJsonLogs($this->_owner->getRawLogFile());
+                    echo $this->renderJsonLogs($this->owner->getRawLogFile());
                 }
             } else {
                 echo '--empty--';
@@ -122,10 +122,10 @@ class FileViewer extends BaseViewer
         } elseif ($file == 'PHPINFO') {
             phpinfo();
         } elseif ($file == 'storage') {
-            list($st, $fn) = explode('/', $_GET['fname']);
+            [$st, $fn] = explode('/', $_GET['fname']);
             echo '<p>';
-            if ($this->_owner->getStorage($st) && method_exists($this->_owner->getStorage($st), 'action'.$fn)) {
-                echo call_user_func([$this->_owner->getStorage($st), 'action'.$fn]);
+            if ($this->owner->getStorage($st) && method_exists($this->owner->getStorage($st), 'action'.$fn)) {
+                echo call_user_func([$this->owner->getStorage($st), 'action'.$fn]);
             } else {
                 echo 'No action call';
             }
@@ -434,7 +434,7 @@ class FileViewer extends BaseViewer
         $is_img = @getimagesize($file);
         $pathinfo['extension'] = $pathinfo['extension'] ?? '';
         if ($is_img) {
-            return '<br/><img src="' . $this->_owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
+            return '<br/><img src="' . $this->owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
         } elseif ($pathinfo['extension'] == 'html' || isset($_GET['only'])) {
             return file_get_contents($file);
         } elseif ($pathinfo['extension'] == FileStorage::FILE_EXT) {

@@ -7,6 +7,6 @@ use xakki\phperrorcatcher\PHPErrorCatcher;
 
 abstract class BasePlugin extends Base
 {
-    protected $initGetKey;
+    protected string $initGetKey;
 
 }
