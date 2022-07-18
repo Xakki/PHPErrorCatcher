@@ -4,9 +4,9 @@ namespace xakki\phperrorcatcher;
 
 abstract class Base
 {
-    protected PHPErrorCatcher $owner;
+    protected PhpErrorCatcher $owner;
 
-    function __construct(PHPErrorCatcher $owner, $config = [])
+    public function __construct(PhpErrorCatcher $owner, $config = [])
     {
         $this->owner = $owner;
         $this->applyConfig($config);
@@ -20,7 +20,7 @@ abstract class Base
     public function applyConfig(array $config): void
     {
         foreach ($config as $key => $value) {
-            if (property_exists($this, $key) && str_starts_with($key, '_')) {
+            if (property_exists($this, $key)) {
                 $this->$key = $value;
             }
         }
@@ -31,19 +31,18 @@ abstract class Base
         $action = substr($method, 0, 3);
         $property = lcfirst(substr($method, 3));
 
-        if ($action === 'get' && property_exists($this, $property) && str_starts_with($property, '_')) {
+        if ($action === 'get' && property_exists($this, $property)) {
             return $this->$property;
-        }
-//        elseif ($action === 'set') {
-//        }
-        else {
+        } else {
             return null;
         }
     }
 
     public function mkdir(string $fileName): bool
     {
-        if (file_exists($fileName)) return true;
+        if (file_exists($fileName)) {
+            return true;
+        }
         $oldUmask = umask(0);
         $res = mkdir($fileName, 0775, true);
         umask($oldUmask);

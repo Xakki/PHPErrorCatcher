@@ -2,15 +2,13 @@
 
 namespace xakki\phperrorcatcher\viewer;
 
+use xakki\phperrorcatcher\HttpData;
 
 /**
- * Class BaseViewer
- * @package xakki\phperrorcatcher\viewer
- * @method string getInitGetKey
+ * @method string getInitGetKey()
  */
 abstract class BaseViewer extends \xakki\phperrorcatcher\Base
 {
-
     protected $initGetKey;
 
     public function getHomeUrl($end = '/')
@@ -20,5 +18,5 @@ abstract class BaseViewer extends \xakki\phperrorcatcher\Base
         return $url['path'] . '?' . $this->getInitGetKey() . '=' . $end;
     }
 
-    abstract public function renderAllLogs($httpData, $logDatas);
+    abstract public static function renderAllLogs(HttpData $httpData, array $logDatas): string;
 }

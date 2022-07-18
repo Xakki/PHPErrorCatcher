@@ -1,6 +1,6 @@
 {
   "name": "xakki/phperrorcatcher",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Logger all error in file for PHP",
   "type": "library",
   "minimum-stability": "dev",
@@ -17,13 +17,18 @@
   },
   "require": {
     "php": ">=8.0",
-    "ext-memcached": "*",
+    "ext-mbstring": "*",
     "ext-json": "*",
     "ext-curl": "*",
+    "ext-pdo": "*",
     "psr/log": "^3.0"
   },
   "require-dev": {
-    "lox/xhprof": "dev-master"
+    "lox/xhprof": "dev-master",
+    "phpunit/phpunit": "^9.5",
+    "phpstan/phpstan": "^1.4",
+    "squizlabs/php_codesniffer": "^3.6",
+    "opsway/psr12-strict-coding-standard": "^0.7"
   },
   "autoload": {
     "psr-4": {
@@ -31,6 +36,16 @@
     }
   },
   "config": {
-    "preferred-install": "dist"
+    "preferred-install": "dist",
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  },
+  "scripts": {
+    "phpstan": "phpstan analyse --memory-limit 2G",
+    "cs-check": "phpcs",
+    "cs-fix": "phpcbf",
+    "cs-commit-check": "git diff --name-only --diff-filter=AM origin/master | grep .php | xargs composer cs-check",
+    "cs-commit-fix": "git diff --name-only --diff-filter=AM origin/master | grep .php | xargs composer cs-fix"
   }
 }
