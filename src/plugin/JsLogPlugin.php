@@ -1,8 +1,8 @@
 <?php
 
-namespace xakki\phperrorcatcher\plugin;
+namespace Xakki\PhpErrorCatcher\plugin;
 
-use xakki\phperrorcatcher\PHPErrorCatcher;
+use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 
 class JsLogPlugin extends BasePlugin
 {
@@ -13,9 +13,9 @@ class JsLogPlugin extends BasePlugin
      */
     protected $catcherLogName = 'myCatcherLog';
     protected $catcherLogFileSeparate = true;
-    protected $level = PHPErrorCatcher::LEVEL_NOTICE;
+    protected $level = PhpErrorCatcher::LEVEL_NOTICE;
 
-    function __construct(PHPErrorCatcher $owner, $config = [])
+    function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
 
@@ -32,7 +32,7 @@ class JsLogPlugin extends BasePlugin
     /**
      * Use catche.js for log error in javascript
      */
-    public function initLogRequest(PHPErrorCatcher $owner)
+    public function initLogRequest(PhpErrorCatcher $owner)
     {
         if (!count($_POST)) {
             $_POST = json_decode(file_get_contents('php://input'), true);
@@ -42,17 +42,19 @@ class JsLogPlugin extends BasePlugin
         $size = mb_strlen(serialize((array)$errstr), '8bit');
         if ($size > 1000) $errstr = mb_substr($errstr, 0, 1000) . '...(' . $size . 'b)...';
         $vars = [
-            PHPErrorCatcher::FIELD_NO_TRICE => true,
-            PHPErrorCatcher::FIELD_FILE => '',
+            PhpErrorCatcher::FIELD_NO_TRICE => true,
+            PhpErrorCatcher::FIELD_FILE => '',
             'ver' => $_POST['v'],
             'url' => $_POST['u'],
             'referrer' => $_POST['r'],
+            'js',
+            $this->catcherLogName,
         ];
         if (!empty($_POST['s'])) $vars['errStack'] = str_replace('||', PHP_EOL, $_POST['s']);
         if (!empty($_POST['l'])) $vars['line'] = $_POST['l'];
 
         $GLOBALS['skipRenderBackTrace'] = 1;
-        $owner->log($this->level, $errstr, ['js', $this->catcherLogName], $vars);
+        $owner->log($this->level, $errstr, $vars);
 
     }
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace xakki\phperrorcatcher\storage;
+namespace Xakki\PhpErrorCatcher\storage;
 
 use PDO;
 

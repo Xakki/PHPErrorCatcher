@@ -1,12 +1,10 @@
 <?php
 
-namespace xakki\phperrorcatcher\plugin;
+namespace Xakki\PhpErrorCatcher\plugin;
 
-use xakki\phperrorcatcher\Base;
-use xakki\phperrorcatcher\PHPErrorCatcher;
+use Xakki\PhpErrorCatcher\Base;
 
 abstract class BasePlugin extends Base
 {
     protected string $initGetKey;
-
 }
