@@ -4,10 +4,13 @@ namespace xakki\phperrorcatcher;
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+if(!defined('STDIN'))  define('STDIN',  fopen('php://stdin',  'rb'));
+if(!defined('STDOUT')) define('STDOUT', fopen('php://stdout', 'wb'));
+if(!defined('STDERR')) define('STDERR', fopen('php://stderr', 'wb'));
 
 class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 {
-    const VERSION = '0.5.0';
+    const VERSION = '0.5.1';
 
     const LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
@@ -28,7 +31,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         FIELD_NO_TRICE = 'trice_no_fake',
         FIELD_ERR_CODE = 'error_code';
 
-    protected static $triggerLevel = array(
+    protected static $triggerLevel = [
         E_ERROR => self::LEVEL_ERROR,
         E_WARNING => self::LEVEL_WARNING,
         E_PARSE => self::LEVEL_CRITICAL,
@@ -44,21 +47,21 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         E_USER_NOTICE => self::LEVEL_NOTICE,
         E_STRICT => self::LEVEL_ERROR,
         E_RECOVERABLE_ERROR => self::LEVEL_ERROR,
-    );
+    ];
 
 
     /************************************/
     // Config
     /************************************/
 
-    protected $showError = false;
-    protected $debugMode = false;//ERROR_DEBUG_MODE
+    public $debugMode = false;//ERROR_DEBUG_MODE
+    public $enableSessionLog = false;
+
     protected $logTimeProfiler = false;// time execute log
     protected $logCookieKey = '';
     protected $dirRoot = '';
     protected $limitTrace = 10;
     protected $limitString = 1024;
-    protected $enableSessionLog = false;
     protected $enableCookieLog = false;
     protected $enablePostLog = true;
     /**
@@ -74,7 +77,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
     protected $safeParamsKey = [
         'password',
         'input_password',
-        'pass'
+        'pass',
     ];
 
     protected $logTraceByLevel = [
@@ -94,7 +97,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
      * @var array|\Memcached
      */
     protected $memcacheServers = [
-        ['localhost', 11211]
+        ['localhost', 11211],
     ];
     protected $lifeTime = 600;//sec // ini_get('max_execution_time')
 
@@ -108,7 +111,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
     protected $_errCount = 0;
     protected $_time_start = null;
     protected $_time_end = null;
-    protected $_overMemory = false;
+
     protected $_isViewMode = false;
     protected $_sessionKey = null;
     protected $_hasError = false;
@@ -117,10 +120,12 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
      * @var plugin\BasePlugin[]
      */
     protected $_plugins = [];
+
     /**
      * @var storage\BaseStorage[]
      */
     protected $_storages = [];
+
     /**
      * @var null|viewer\BaseViewer
      */
@@ -188,15 +193,15 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 
             register_shutdown_function([
                 $this,
-                'handleShutdown'
+                'handleShutdown',
             ]);
             set_error_handler([
                 $this,
-                'handleTrigger'
+                'handleTrigger',
             ], E_ALL);
             set_exception_handler([
                 $this,
-                'handleException'
+                'handleException',
             ]);
 
             if (!empty($config['plugin']))
@@ -206,7 +211,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
                 $this->initViewer($config['viewer']);
             }
 
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             if ($this->debugMode) {
                 echo 'Cant init logger: ' . $e->__toString();
                 exit('ERR');
@@ -221,7 +226,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         $this->_storages = [];
     }
 
-    public function applyConfig($config)
+    protected function applyConfig($config)
     {
         foreach ($config as $key => $value) {
             if (property_exists($this, $key) && substr($key, 0, 1) != '_') {
@@ -230,6 +235,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         }
     }
 
+    /**
+     * @deprecated
+     */
     public static function setConfig($key, $value)
     {
         if (property_exists(static::$_obj, $key) && substr($key, 0, 1) != '_') {
@@ -237,6 +245,9 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         }
     }
 
+    /**
+     * @deprecated
+     */
     public function get($key)
     {
         if (property_exists($this, $key)) {
@@ -324,7 +335,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
             $fields = [
                 self::FIELD_FILE => $this->getRelativeFilePath($error['file']) . ':' . $error['line'],
                 self::FIELD_LOG_TYPE => self::TYPE_FATAL,
-                self::FIELD_ERR_CODE => $error['type']
+                self::FIELD_ERR_CODE => $error['type'],
             ];
             $this->log(self::$triggerLevel[$error['type']], $error['message'], ['unhandle'], $fields);
         }
@@ -364,14 +375,24 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
      */
     public function handleTrigger($errno, $errstr, $errfile, $errline, $vars = null)
     {
+        if (!(error_reporting() & $errno)) {
+            // также игнорируются ошибки помеченные @
+            return true;
+        }
+
         $fields = [
             self::FIELD_FILE => $this->getRelativeFilePath($errfile) . ':' . $errline,
             self::FIELD_LOG_TYPE => self::TYPE_TRIGGER,
             self::FIELD_ERR_CODE => $errno,
-            self::FIELD_TRICE => array_slice(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $this->limitTrace + 1), 1)
+            self::FIELD_TRICE => array_slice(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $this->limitTrace + 1), 1),
         ];
+
         $this->log(self::$triggerLevel[$errno], $errstr, [], $fields);
-        if (function_exists('error_clear_last')) \error_clear_last();
+
+        if (function_exists('error_clear_last'))
+            \error_clear_last();
+
+        return true; /* Не запускаем внутренний обработчик ошибок PHP */
     }
 
     /****************************************************/
@@ -475,12 +496,8 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 
     protected function add(LogData $logData)
     {
+        $this->consolePrint($logData);
 
-        if ($this->showError) {
-            echo PHP_EOL;
-            print_r($logData);
-            echo PHP_EOL;
-        }
         $result = false;
         $key = $logData->logKey;
         if ($this->memcache()) {
@@ -508,7 +525,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
                     }
                 }
 
-            } catch (\Throwable $e) {
+            } catch (\Exception $e) {
                 echo '<p>Error: ' . $e->__toString() . '</p>';
             }
         }
@@ -521,6 +538,60 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         }
         if (self::$_userCatchLogFlag) {
             self::$_userCatchLogKeys[$key] = true;
+        }
+    }
+
+    const COLOR_GREEN = '0;32',
+        COLOR_GRAY = '0;37',
+        COLOR_GRAY2 = '1;37',
+        COLOR_YELLOW = '1;33',
+        COLOR_RED = '0;31',
+        COLOR_WHITE = '1;37',
+        COLOR_LIGHT_BLUE = '1;34',
+        COLOR_BLUE = '0;34',
+        COLOR_BLUE2 = '1;36';
+
+    const CLI_LEVEL_COLOR = [
+        self::LEVEL_CRITICAL => self::COLOR_RED,
+        self::LEVEL_ERROR => self::COLOR_RED,
+        self::LEVEL_WARNING => self::COLOR_YELLOW,
+        self::LEVEL_NOTICE => self::COLOR_BLUE,
+        self::LEVEL_INFO => self::COLOR_GREEN,
+        self::LEVEL_TIME => self::COLOR_LIGHT_BLUE,
+        self::LEVEL_DEBUG => self::COLOR_BLUE2,
+    ];
+
+    private static function cliColor($text, $colorId)
+    {
+        if (!isset($_SERVER['TERM'])) return $text;
+        return "\033[" . $colorId . "m" . $text . "\033[0m";
+    }
+
+    protected function consolePrint(LogData $logData)
+    {
+        if (empty($_SERVER['argv'])) return;
+
+        if ($logData->level === self::LEVEL_DEBUG && !$this->debugMode) return;
+
+        $output = PHP_EOL . rtrim(\DateTime::createFromFormat('U.u', $logData->timestamp)->format('H:i:s.u'), '0')
+            . ' ' . self::cliColor($logData->level, self::CLI_LEVEL_COLOR[$logData->level]);
+        if ($logData->tags)
+            $output .= self::cliColor(' [' . implode(', ', $logData->tags) . ']', self::COLOR_GRAY);
+        if (isset(self::$_errorLevel[$logData->level])) {
+            if ($logData->fields) {
+                $output .= ' ' . self::cliColor(json_encode($logData->fields), self::COLOR_GRAY);
+            }
+            if ($logData->file) {
+                $output .= PHP_EOL . "\t" . $logData->file;
+            }
+        }
+        $output .= PHP_EOL . "\t" . str_replace(PHP_EOL, "\n\t", self::cliColor($logData->message, self::COLOR_GRAY2)) . PHP_EOL;
+
+        if (isset($_SERVER['TERM'])) {
+            fwrite(\STDERR, $output); // Ошибки в консоли можно залогировать толкьо так `&2 >>`
+        } else {
+            // Для кронов, чтобы все логи по умолчанию выводились дефолтно черезе `>>`
+            fwrite(\STDOUT, $output);
         }
     }
 
@@ -610,7 +681,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         //            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
         //                //$logs .= $this->renderItemLog($logData);
         //            }
-        //        } catch (\Throwable $e) {
+        //        } catch (\Exception $e) {
         //            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
         //        }
         //        self::$_userCatchLogFlag = false;
@@ -629,20 +700,22 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
      * Профилирование алгоритмов и функций отдельно
      * @param null $timeOut
      */
-    public static function funcStart($timeOut)
+    public static function funcStart()
     {
         static::$_functionStartTime = microtime(true);
-        static::$_functionTimeOut = $timeOut;
+//        static::$_functionTimeOut = $timeOut;
     }
 
-    public static function funcEnd($name, $info = null, $simple = true)
+    public static function funcEnd()
     {
         // TODO
         $timer = (microtime(true) - static::$_functionStartTime) * 1000;
-        if (static::$_functionTimeOut && $timer < static::$_functionTimeOut) {
-            return null;
-        }
-        return static::$_obj->saveStatsProfiler($name, $info, $simple);
+        self::funcStart();
+        return $timer;
+//        if (static::$_functionTimeOut && $timer < static::$_functionTimeOut) {
+//            return null;
+//        }
+//        return static::$_obj->saveStatsProfiler($name, $info, $simple);
     }
 
     protected static $tick;
@@ -694,27 +767,27 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
             }
             $prf = '';
             if (!is_numeric($k))
-                $prf = $k.':';
+                $prf = $k . ':';
             if (is_null($v))
-                $args[] = $prf.'NULL';
+                $args[] = $prf . 'NULL';
             else if (is_array($v))
-                $args[] = $prf.'[' . implode(', ', self::renderDebugArray($v, $arrLen, $strLen)) . ']';
+                $args[] = $prf . '[' . implode(', ', self::renderDebugArray($v, $arrLen, $strLen)) . ']';
             else if (is_object($v))
-                $args[] = $prf.get_class($v);
+                $args[] = $prf . get_class($v);
             else if (is_bool($v))
-                $args[] = $prf.($v ? 'T' : 'F');
+                $args[] = $prf . ($v ? 'T' : 'F');
             else if (is_resource($v))
-                $args[] = $prf.'RESOURCE';
+                $args[] = $prf . 'RESOURCE';
             else if (is_numeric($v))
-                $args[] = $prf.$v;
+                $args[] = $prf . $v;
             else if (is_string($v)) {
                 $l = mb_strlen($v);
                 if ($l > $strLen) {
-                    $v = mb_substr($v, 0, $strLen - 30) . '...('.$l.')...'.mb_substr($v, $l - 20);
+                    $v = mb_substr($v, 0, $strLen - 30) . '...(' . $l . ')...' . mb_substr($v, $l - 20);
                 }
-                $args[] = $prf.'"' . preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '], $v) . '"';
+                $args[] = $prf . '"' . preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '], $v) . '"';
             } else {
-                $args[] = $prf.'OVER';
+                $args[] = $prf . 'OVER';
             }
             $i--;
         }
@@ -822,56 +895,98 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         return $this->dirRoot . '/raw.' . storage\FileStorage::FILE_EXT;
     }
 
-    public static function renderVars($vars, $sl = 0)
+    public static function renderVars($var, $depth = 3, $highlight = false) {
+        return self::dumpAsString($var, $depth = 3);
+    }
+    
+    private static $objects = [];
+    public static function dumpAsString($var, $depth = 3, $highlight = false)
     {
-        $limitString = static::init()->get('limitString');
-        $slr = str_repeat("\t", $sl);
-        if (is_object($vars)) {
-            $vars = 'Object: ' . get_class($vars);
-
-        } elseif (is_string($vars)) {
-            $size = mb_strlen($vars, '8bit');
-            if ($size > $limitString) $vars = '"' . mb_substr(static::_e($vars), 0, $limitString) . '...(' . $size . 'b)"'; else $vars = '"' . static::_e($vars) . '"';
-
-        } elseif (is_array($vars)) {
-            if (isset($vars['_SERVER'])) return '';
-            $vv = '[' . PHP_EOL;
-            foreach ($vars as $k => $r) {
-                $vv .= $slr . "\t" . static::_e($k) . ' => ';
-                if (isset($GLOBALS[$k])) {
-                    $vv .= 'GLOBAL VAR';
-                } elseif (is_array($r)) {
-                    $vv .= static::renderVars($r, ($sl + 1));
-                } elseif (is_object($r)) {
-                    $vv .= 'Object: ' . get_class($r);
-                } elseif (is_string($r)) {
-                    $vv .= static::_e(mb_substr($r, 0, $limitString));
-                } elseif (is_resource($r)) {
-                    $vv .= 'Resource: ' . get_resource_type($r);
-                } elseif (is_int($r)) {
-                    $vv .= $r;
-                } else {
-                    $vv .= gettype($r) . ': "' . static::_e(var_export($r, true)) . '"';
-                }
-                $vv .= PHP_EOL;
-            }
-            $vv .= $slr . ']';
-            $vars = $vv;
-            //                $size = mb_strlen(json_encode($vars), '8bit');
-            //                if ($size > 5048) $vars = 'ARRAY: ...(vars size = ' . $size . 'b)...';
-            //                elseif (!is_string($vars)) $vars = 'ARRAY: '.static::_e(var_export($vars, true));
-
-        } elseif (is_resource($vars)) {
-            $vars = 'RESOURCE: ' . get_resource_type($vars);
-
-        } elseif (null === $vars) {
-            $vars = 'NULL';
-        } elseif (!is_int($vars)) {
-            $vars = gettype($vars) . ': "' . static::_e(var_export($vars, true)) . '"';
+        $output = self::dumpInternal($var, $depth, 0);
+        if ($highlight) {
+            $result = highlight_string("<?php\n" . $output, true);
+            $output = preg_replace('/&lt;\\?php<br \\/>/', '', $result, 1);
         }
-        $vars .= PHP_EOL;
-
-        return $slr . $vars;
+        self::$objects = [];
+        return $output;
+    }
+    
+    private static function dumpInternal($var, $depth, $level = 0)
+    {
+        $output = '';
+        switch (gettype($var)) {
+            case 'boolean':
+                $output .= $var ? 'T' : 'F';
+                break;
+            case 'integer':
+            case 'double':
+                $output .= (string)$var;
+                break;
+            case 'string':
+                $limitString = static::init()->limitString;
+                $size = mb_strlen($var);
+                if ($size > $limitString) {
+                    $output = '"' . static::_e(mb_substr($var, 0, $limitString)) . '...(' . $size . 'b)"'; 
+                }
+                else {
+                    $output = '"' . static::_e($var) . '"';
+                }
+                break;
+            case 'resource':
+                $output .= '{resource}';
+                break;
+            case 'NULL':
+                $output .= 'null';
+                break;
+            case 'unknown type':
+                $output .= '{unknown}';
+                break;
+            case 'array':
+                if ($depth <= $level) {
+                    $output .= '[...]';
+                } elseif (empty($var)) {
+                    $output .= '[]';
+                } else {
+                    $spaces = str_repeat(' ', $level * 4);
+                    $output .= '[';
+                    foreach ($var as $key => $val) {
+                        $output .= "\n" . $spaces . '    ';
+                        $output .= self::dumpInternal($key, $depth, 0);
+                        $output .= ' => ';
+                        $output .= self::dumpInternal($val, $depth, $level + 1);
+                    }
+                    $output .= "\n" . $spaces . ']';
+                }
+                break;
+            case 'object':
+                $id = array_search($var, self::$objects, true);
+                if ($id !== false) {
+                    $output .= get_class($var) . '#' . ($id + 1) . '(...)';
+                } elseif ($depth <= $level) {
+                    $output .= get_class($var) . '(...)';
+                } else {
+                    $id = array_push(self::$objects, $var);
+                    $className = get_class($var);
+                    $spaces = str_repeat(' ', $level * 4);
+                    $output .= "$className#$id\n" . $spaces . '(';
+                    if ('__PHP_Incomplete_Class' !== get_class($var) && method_exists($var, '__debugInfo')) {
+                        $dumpValues = $var->__debugInfo();
+                        if (!is_array($dumpValues)) {
+                            throw new \Exception('__debuginfo() must return an array');
+                        }
+                    } else {
+                        $dumpValues = (array) $var;
+                    }
+                    foreach ($dumpValues as $key => $value) {
+                        $keyDisplay = strtr(trim($key), "\0", ':');
+                        $output .= "\n" . $spaces . "    [$keyDisplay] => ";
+                        $output .= self::dumpInternal($value, $depth, $level + 1);
+                    }
+                    $output .= "\n" . $spaces . ')';
+                }
+                break;
+        }
+        return $output;
     }
 
     public function getLogDataFromMemcache($key)
@@ -890,57 +1005,58 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 
     /***************************************************/
 
-    public function emergency($message, array $tags = array(), array $fields = array())
+    public function emergency($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_CRITICAL;
         $tags[] = 'emergency';
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function alert($message, array $tags = array(), array $fields = array())
+    public function alert($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_CRITICAL;
         $tags[] = 'alert';
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function critical($message, array $tags = array(), array $fields = array())
+    public function critical($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_CRITICAL;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function error($message, array $tags = array(), array $fields = array())
+    public function error($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_ERROR;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function warning($message, array $tags = array(), array $fields = array())
+    public function warning($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_WARNING;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function notice($message, array $tags = array(), array $fields = array())
+    public function notice($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_NOTICE;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function info($message, array $tags = array(), array $fields = array())
+    public function info($message, array $tags = [], array $fields = [])
     {
         $level = self::LEVEL_INFO;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public function debug($message, array $tags = array(), array $fields = array())
+    public function debug($message, array $tags = [], array $fields = [])
     {
+        if (!$this->debugMode) return true;
         $level = self::LEVEL_DEBUG;
         return $this->log($level, $message, $tags, $fields);
     }
 
-    public static function logger($level, $message, $tags = array(), array $fields = array())
+    public static function logger($level, $message, $tags = [], array $fields = [])
     {
         return static::init()->log($level, $message, $tags, $fields);
     }
@@ -965,7 +1081,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
      * @param string $level
      * @return bool
      */
-    public function log($level, $msg, array $tags = array(), array $fields = array())
+    public function log($level, $msg, array $tags = [], array $fields = [])
     {
         if (!isset($fields[self::FIELD_LOG_TYPE])) $fields[self::FIELD_LOG_TYPE] = self::TYPE_LOGGER;
 
@@ -990,10 +1106,6 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
         } elseif ($this->_count > 100) {
             // TODO: print in cli mode
             return;
-        }
-
-        if (self::isMemoryOver()) {
-            $this->_overMemory = true;
         }
 
         if (is_object($msg)) {
@@ -1043,7 +1155,7 @@ class PHPErrorCatcher implements \Psr\Log\LoggerInterface
 
         $logData->tags = array_values(array_unique(self::arrayToLower($tags)));
         $logData->fields = $fields;
-        $logData->timestamp = (int)(microtime(true) * 1000);
+        $logData->timestamp = microtime(true);
         $logData->logKey = 'phpeErCh_' . $this->getSessionKey() . '_' . md5($logData->message . $logData->file);
 
         $this->add($logData);
