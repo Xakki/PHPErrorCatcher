@@ -3,8 +3,9 @@
 namespace Xakki\PhpErrorCatcher\connector;
 
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use yii\log\Logger;
 
-class YiiLogger extends \yii\log\Logger
+class YiiLogger extends Logger
 {
     public $targets = [];
     static $toMylevels = [

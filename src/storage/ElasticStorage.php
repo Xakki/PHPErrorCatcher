@@ -1,32 +1,35 @@
 <?php
+declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
 
 use Generator;
-use Xakki\PhpErrorCatcher\LogData;
+use Xakki\PhpErrorCatcher\dto\LogData;
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\Tools;
 
 class ElasticStorage extends BaseStorage
 {
-    protected $index = 'phplogs';
-    protected $url = '';//http://localhost:9200
-    protected $file = null; //'/var/log/app.log'    // OR fo filebeat
-    protected $auth = ''; // user:pass
+    protected string $index = 'phplogs';
+    protected string $file = ''; //'/var/log/app.log'    // OR fo filebeat
+    protected string $url = '';//http://localhost:9200
+    protected string $auth = ''; // user:pass
 
     public function __destruct()
     {
         if ($this->owner->needSaveLog()) {
-//            $this->initLogIndex();
+
             if ($this->putData($this->owner->getDataLogsGenerator(), $_SERVER)) {
                 $this->owner->successSaveLog();
             }
         }
     }
 
-    public function getViewMenu()
+    public function getViewMenu(): array
     {
         $menu = [];
         if ($this->url) {
+            // Run actionIndexMapping()
             $menu['IndexMapping'] = 'Elastic Mapping';
         }
         return $menu;
@@ -36,16 +39,16 @@ class ElasticStorage extends BaseStorage
      * @param Generator|LogData[] $logsData
      * @return bool
      */
-    protected function putData(Generator|array $logsData, array $serverData): bool
+    protected function putData(Generator $logsData, array $serverData): bool
     {
         if ($this->file && substr($this->file, 0, 1) == '/') {
             if (!$this->mkdir(dirname($this->file))) {
                 return false;
             }
-            foreach ($logsData as $key => $logData) {
+            foreach ($logsData as $logData) {
                 file_put_contents(
                     $this->file,
-                    PhpErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE) . PHP_EOL,
+                    Tools::safeJsonEncode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE) . PHP_EOL,
                     FILE_APPEND
                 );
             }
@@ -59,9 +62,9 @@ class ElasticStorage extends BaseStorage
         $data = [];
         $meta = json_encode(['index' => ["_index" => $this->index . '-' . date('Y-m')]]);
 //        $meta = '{"index":{}}';
-        foreach ($logsData as $key => $logData) {
+        foreach ($logsData as $logData) {
             $data[] = $meta;
-            $data[] = PhpErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
+            $data[] = Tools::safeJsonEncode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
         }
         // . '/' . $this->index . '/' . $this->type
         return $this->sendDataToElastic(implode(PHP_EOL, $data) . PHP_EOL, $this->url . '/_bulk', 'POST');
@@ -266,7 +269,7 @@ class ElasticStorage extends BaseStorage
     protected function sendDataToElastic(mixed $data, string $url, string $method): bool
     {
         if (!is_string($data)) {
-            $data = PhpErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE);
+            $data = Tools::safeJsonEncode($data, JSON_UNESCAPED_UNICODE);
         }
 
         $params = [
@@ -313,14 +316,11 @@ class ElasticStorage extends BaseStorage
         }
 
         if ($isErr) {
-            if ($this->owner::$debugMode) {
-                print_r('<pre>');
-                print_r($text);
-                print_r(json_decode($text, true));
-                print_r($info);
-                print_r('</pre>');
-            }
-            $this->owner->error($text, ['elastic'], ['http_code' => $info['http_code'], ['trace' => []]]);
+            $this->owner->error($text . PHP_EOL . json_encode($info), [
+                PhpErrorCatcher::FIELD_NO_TRICE => true,
+                PhpErrorCatcher::FIELD_FILE => '',
+                'elastic'
+            ]);
             return false;
         }
         return true;

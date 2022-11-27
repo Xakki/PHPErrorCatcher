@@ -1,15 +1,23 @@
 <?php
+declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\viewer;
 
-use Xakki\PhpErrorCatcher\HttpData;
-use Xakki\PhpErrorCatcher\LogData;
+use Exception;
+use Generator;
+use Xakki\PhpErrorCatcher\dto\HttpData;
+use Xakki\PhpErrorCatcher\dto\LogData;
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\storage\FileStorage;
+use Xakki\PhpErrorCatcher\Tools;
 
 class FileViewer extends BaseViewer
 {
-    public const VERSION = '0.1';
+    public const VERSION = '0.2';
+
+    protected string $initGetKey;
+    protected static string $realPath = '';
+    protected bool $allowBackUp = true;
 
     public array $errorListView = [
         PhpErrorCatcher::LEVEL_CRITICAL => [
@@ -58,10 +66,17 @@ class FileViewer extends BaseViewer
             echo '<p>need initGetKey for FileViewer</p>';
             exit();
         }
-        // @phpstan-ignore-next-line
-        $this->fileStorage = $owner->getStorage('FileStorage');
-        if (!$this->fileStorage) {
+        $fileStorage = $owner->getStorage('FileStorage');
+        if (!$fileStorage) {
             echo '<p>need FileStorage for FileViewer</p>';
+            exit();
+        }
+        // @phpstan-ignore-next-line
+        $this->fileStorage = $fileStorage;
+
+        if (isset($_GET[$config['initGetKey']])) {
+            ini_set("memory_limit", "128M");
+            $this->renderView();
             exit();
         }
     }
@@ -69,7 +84,7 @@ class FileViewer extends BaseViewer
     /**
      * Просмотр логов
      */
-    public function renderView(): void
+    protected function renderView(): void
     {
         $url = str_replace([
             '\\',
@@ -85,8 +100,9 @@ class FileViewer extends BaseViewer
         } else {
             header('Content-type: text/html; charset=UTF-8');
         }
+        $isFullPage = !isset($_GET['only']) && empty($_GET['backup']);
 
-        if (!isset($_GET['only']) && empty($_GET['backup'])) {
+        if ($isFullPage) {
             $this->renderViewHead($file);
         }
 
@@ -97,19 +113,7 @@ class FileViewer extends BaseViewer
         //            echo $this->viewRenderPROF();
         //        }
         //        else
-        if ($file == 'rawlog') {
-            if (file_exists($this->owner->getRawLogFile())) {
-                if (!empty($_GET['del'])) {
-                    unlink($this->owner->getRawLogFile());
-                    echo '--empty--';
-                } else {
-                    echo '<p><a href="' . $this->getHomeUrl('') . 'rawlog&del=1" class="linkDel">Удалить</a></p>';
-                    echo $this->renderJsonLogs($this->owner->getRawLogFile());
-                }
-            } else {
-                echo '--empty--';
-            }
-        } elseif ($file == 'PHPINFO') {
+        if ($file == 'PHPINFO') {
             phpinfo();
         } elseif ($file == 'storage') {
             [$st, $fn] = explode('/', $_GET['fname']);
@@ -129,35 +133,34 @@ class FileViewer extends BaseViewer
                     return;
                 } elseif (is_dir($file)) {
                     if (isset($_GET['backup'])) {
-                        $this->viewCreateBackUpDir($file);
+                        $this->renderViewCreateBackUpDir($file);
                         return;
                     }
-                    echo $this->renderViewBreadCrumb($url);
-                    echo $this->renderViewDirList(static::viewGetDirList($url));
+                    $this->renderViewBreadCrumb($url);
+                    $this->renderViewDirList(static::viewGetDirList($url));
                 } else {
                     if (isset($_GET['backup'])) {
-                        $this->viewCreateBackUp($file);
+                        $this->renderViewCreateBackUp($file);
                         return;
                     }
 
                     if (!isset($_GET['only'])) {
-                        echo $this->renderViewBreadCrumb($url);
+                        $this->renderViewBreadCrumb($url);
 
-                        if (!$this->checkIsBackUp($file)) {
+                        if (!$this->fileStorage->checkIsBackUp($file)) {
                             echo ' [<a href="' . $_SERVER['REQUEST_URI'] . '&only=1&download=1" class="linkSource">Download</a> <a href="' . $_SERVER['REQUEST_URI'] . '&only=1" class="linkSource">Source</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=do">Бекап</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=del">Удалить</a>]';
                         }
                         echo '</h3>';
                     }
-                    //chmod($file, 0777);
-                    echo $this->getFileContent($file);
+                    $this->renderFileContent($file);
                 }
             } else {
                 echo '<h3>Logs</h3>';
-                echo $this->renderViewDirList(static::viewGetDirList());
+                $this->renderViewDirList(static::viewGetDirList());
             }
         }
 
-        if (!isset($_GET['only'])) {
+        if ($isFullPage) {
             echo '</body></html>';
         }
     }
@@ -165,7 +168,7 @@ class FileViewer extends BaseViewer
     /**
      * рендер заголовка HTML
      */
-    public function renderViewHead(string $file): void
+    protected function renderViewHead(string $file): void
     {
         include __DIR__ . '/file/tpl.php';
     }
@@ -173,7 +176,7 @@ class FileViewer extends BaseViewer
     /**
      * Просмотр Директории логов
      */
-    public function viewGetDirList(string $path = ''): array
+    protected function viewGetDirList(string $path = ''): array
     {
         $dirList1 = $dirList2 = [];
         $path = trim($path, '/.');
@@ -188,7 +191,7 @@ class FileViewer extends BaseViewer
                 return [];
             }
         }
-        $isBackUpDir = $this->checkIsBackUp($fullPath);
+        $isBackUpDir = $this->fileStorage->checkIsBackUp($fullPath);
         $dir = dir($fullPath);
         $homeUrl = $this->getHomeUrl();
 
@@ -233,7 +236,7 @@ class FileViewer extends BaseViewer
                     '<a href="' . $fileUrl . '" style="' . (is_dir($filePath) ? 'font-weight:bold;' : '') . '">' . $path . '/' . $entry . '</a> ',
                     $size,
                     $create,
-                    ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Source</a>' : '') . (!$isBackUpDir && ($path || !$this->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
+                    ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Source</a>' : '') . (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
                     $createTime,
                 ];
                 // glyphicon glyphicon-hdd
@@ -253,10 +256,10 @@ class FileViewer extends BaseViewer
     /**
      * Рендер директории логов
      */
-    public function renderViewDirList(array $dirList): string
+    protected function renderViewDirList(array $dirList): void
     {
-        $html = '<table class="table table-striped" style="width: auto;">';
-        $html .= '<thead>
+        echo '<table class="table table-striped" style="width: auto;">';
+        echo '<thead>
             <tr>
               <th>name</th>
               <th>size</th>
@@ -266,22 +269,21 @@ class FileViewer extends BaseViewer
           </thead>
           <tbody>';
         foreach ($dirList as $row) {
-            $html .= '<tr><td>' . $row[0] . '<td>' . $row[1] . '<td>' . $row[2] . '<td>' . $row[3] . '</tr>';
+            echo '<tr><td>' . $row[0] . '<td>' . $row[1] . '<td>' . $row[2] . '<td>' . $row[3] . '</tr>';
         }
-        $html .= '</tbody></table>';
-        return $html;
+        echo '</tbody></table>';
     }
 
     /**
      * Делаем бекап фаила и ссылку на него
      */
-    private function viewCreateBackUp(string $file): void
+    protected function renderViewCreateBackUp(string $file): void
     {
         if (!file_exists($file)) {
             header('Location: ' . $this->getPreviosUrl());
         } elseif (is_dir($file)) {
             echo 'Is Dir';
-        } elseif ($this->checkIsBackUp($file)) {
+        } elseif ($this->fileStorage->checkIsBackUp($file)) {
             echo 'Is BackUp Dir: is protect  dir';
         }
 
@@ -329,13 +331,13 @@ class FileViewer extends BaseViewer
     /**
      * Бекапи логи
      */
-    private function viewCreateBackUpDir(string $dir): void
+    protected function renderViewCreateBackUpDir(string $dir): void
     {
         if (!is_dir($dir)) {
             echo 'Is not Dir';
         }
-        if (defined('ERROR_NO_BACKUP')) {
-            static::delTree($dir);
+        if (!$this->allowBackUp) {
+            Tools::delTree($dir);
         } else {
             $backUpFileDir = str_replace($this->fileStorage->getLogPath(), $this->fileStorage->getLogPath() . $this->fileStorage->getBackUpDir(), $dir);
             if (file_exists($backUpFileDir)) {
@@ -356,11 +358,9 @@ class FileViewer extends BaseViewer
     /**
      * Хлебные крошки
      */
-    private function renderViewBreadCrumb(string $url): string
+    protected function renderViewBreadCrumb(string $url): void
     {
         $temp = preg_split('/\//', $url, -1, PREG_SPLIT_NO_EMPTY);
-        $url = $_SERVER['REQUEST_URI'];
-        $url = parse_url($url);
         $basePath = $fullPath = $this->getHomeUrl('');
         $ctr = '<li class="breadcrumb-item"><a href="' . $basePath . '">Home</a></li>';
         foreach ($temp as $r) {
@@ -368,10 +368,10 @@ class FileViewer extends BaseViewer
             $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . $r . '</a></li>';
         }
 
-        return '<nav aria-label="breadcrumb"><ol class="breadcrumb">' . $ctr . '</ol></nav>';
+        echo '<nav aria-label="breadcrumb"><ol class="breadcrumb">' . $ctr . '</ol></nav>';
     }
 
-    private function getPreviosUrl()
+    protected function getPreviosUrl(): string
     {
         $temp = preg_split('/\//', $_GET[$this->initGetKey], -1, PREG_SPLIT_NO_EMPTY);
         array_pop($temp);
@@ -380,27 +380,7 @@ class FileViewer extends BaseViewer
 
     /*********************************/
 
-    private function checkIsBackUp(string $file): bool
-    {
-        return strpos($file, $this->fileStorage->getLogPath() . $this->fileStorage->getBackUpDir()) !== false;
-    }
-
-    /**
-     * Рекурсивно удаляем директорию
-     */
-    public static function delTree(string $dir): bool
-    {
-        $files = array_diff(scandir($dir), [
-            '.',
-            '..',
-        ]);
-        foreach ($files as $file) {
-            is_dir("$dir/$file") ? static::delTree("$dir/$file") : unlink("$dir/$file");
-        }
-        return rmdir($dir);
-    }
-
-    public function getFileContent(string $file): string
+    protected function renderFileContent(string $file): void
     {
         // if ()
         // mime_content_type
@@ -408,151 +388,120 @@ class FileViewer extends BaseViewer
         $isImg = getimagesize($file);
         $pathinfo['extension'] = $pathinfo['extension'] ?? '';
         if ($isImg) {
-            return '<br/><img src="' . $this->owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
+            echo '<br/><img src="' . $this->owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
         } elseif ($pathinfo['extension'] == 'html' || isset($_GET['only'])) {
-            return file_get_contents($file);
+            echo file_get_contents($file);
         } elseif ($pathinfo['extension'] == FileStorage::FILE_EXT) {
-            return $this->renderJsonLogs($file);
+            $this->renderJsonLogs($file);
         } else {
-            return '<pre>' . file_get_contents($file) . '</pre>';
+            echo '<pre>' . file_get_contents($file) . '</pre>';
         }
     }
 
-    public function getFileUrl($realFilePath)
+    protected function getFileUrl(string $realFilePath): string
     {
         $realFilePath = str_replace($this->fileStorage->getLogPath(), '', $realFilePath);
         return $this->getHomeUrl() . ltrim($realFilePath, '/');
     }
 
-    /*******************************************************/
-    /*******************************************************/
-    /*******************************************************/
-    /*******************************************************/
-
-    protected function renderJsonLogs(string $file): string
+    protected function renderJsonLogs(string $file): void
     {
-        $html = '';
-        if (!file_exists($file)) {
-            return 'No file';
+        try {
+            foreach (FileStorage::iterateFileLog($file) as $r) {
+                self::renderAllLogs($r['http'], $r['logs']);
+            }
+        } catch (Exception $e) {
+            echo '<h2>Error: ' . $e->getMessage() . '</h2>';
         }
-        $fileHandle = fopen($file, "r");
-        while (!feof($fileHandle)) {
-            $line = fgets($fileHandle);
-            if (!$line) {
-                continue;
-            }
-            $data = json_decode($line);
-            if (!empty($data->http) && !empty($data->logs)) {
-                $html .= self::renderAllLogs($data->http, $data->logs);
-            } else {
-                $html .= '<pre>' . $line . '</pre>';
-            }
-            if (PhpErrorCatcher::isMemoryOver()) {
-                $html = '<h3>isMemoryOver</h3>' . $html;
-                break;
-            }
-        }
-        fclose($fileHandle);
-        return $html;
     }
+
+    protected static function getFileIdea(string $file, int $line): string
+    {
+        return 'idea://open?url=file://' . self::$realPath . $file . '&line=' . $line;
+    }
+
+    /*******************************************************/
+    /*******************************************************/
+    /*******************************************************/
+    /*******************************************************/
 
     /**
      * Render line
      *
      * @param HttpData $httpData
-     * @param LogData[] $logDatas
-     * @return string
+     * @param LogData[]|Generator $logs
+     * @return void
      */
-    public static function renderAllLogs(HttpData $httpData, array $logDatas): string
+    public static function renderAllLogs(HttpData $httpData, Generator $logs): void
     {
         //        $this->_owner->setSafeParams();
         //        $profilerUrlTag = '';
         //        if ($this->_profilerUrl) {
         //            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
         //        }
-        $html = '<div class="bugs">';
+        echo '<div class="bugs">';
         if (!empty($httpData->method)) {
-            $html .= '<span class="bugs_uri">' . $httpData->method . '</span> ';
+            echo '<span class="bugs_uri">' . $httpData->method . '</span> ';
         }
         if (!empty($httpData->host)) {
-            $html .= '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
+            echo '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
         }
 
         if (!empty($httpData->ipAddr)) {
-            $html .= '<span class="bugs_ip">' . $httpData->ipAddr . '</span> ';
+            echo '<span class="bugs_ip">' . $httpData->ipAddr . '</span> ';
         }
         if (!empty($httpData->referrer)) {
-            $html .= '<span class="bugs_ref">' . $httpData->referrer . '</span> ';
+            echo '<span class="bugs_ref">' . $httpData->referrer . '</span> ';
         }
         if (!empty($httpData->overMemory)) {
-            $html .= '<span class="bugs_alert">Over memory limit</span> ';
+            echo '<span class="bugs_alert">Over memory limit</span> ';
         }
 
-        foreach ($logDatas as $logData) {
-            $html .= static::renderItemLog($logData);
+        foreach ($logs as $logData) {
+            static::renderItemLog($logData);
         }
 
-        return $html . '</div>';
+        echo '</div>';
     }
 
-    public static function renderItemLog(LogData $logData): string
+    public static function renderItemLog(LogData $logData): void
     {
-        $dt = explode('.', (string) $logData->timestamp);
-        $res = '<div class="bug_item bug_level_' . $logData->level . '">'
-            . '<span class="bug_time">' . date('H:i:s', $dt[0]) . '.' . $dt[1] . '</span>'
+        $dt = explode('.', (string)$logData->timestamp);
+        echo '<div class="bug_item bug_level_' . $logData->level . '">'
+            . '<span class="bug_time">' . date('H:i:s', (int)$dt[0]) . '.' . $dt[1] . '</span>'
             . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '[' . $logData->count . ']' : '') . '</span>';
         //(isset($logData->fields[PhpErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PhpErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
         if ($logData->tags) {
-             array_walk($logData->tags, function (&$v) {
-                if (!is_string($v)) {
-                    $v = PhpErrorCatcher::dumpAsString($v);
-                }
-                if (mb_strlen($v) > 32) {
-                    $v = mb_substr($v, 32) . '...';
-                }
-                 $v = PhpErrorCatcher::esc($v);
-             });
-            $res .= '<span class="bug_tags">[' . implode(', ', $logData->tags) . ']</span>';
+            array_walk($logData->tags, function (&$v) {
+                $v = Tools::esc($v);
+            });
+            echo '<span class="bug_tags">[' . implode(', ', $logData->tags) . ']</span>';
         }
         if ($logData->fields) {
-            $logData->fields = (array) $logData->fields;
-             array_walk($logData->fields, function (&$v) {
-                if (!is_string($v)) {
-                    $v = PhpErrorCatcher::dumpAsString($v);
-                }
-                if (mb_strlen($v) > 512) {
-                    $v = mb_substr($v, 512) . '...';
-                }
-             });
-            $res .= '<span class="bug_fields">' . json_encode($logData->fields) . '</span>';
+            echo '<span class="bug_fields">' . json_encode($logData->fields) . '</span>';
         }
         if ($logData->file) {
             //        $debug .= '<div class="bug_file"> File <a href="file:/' . $errfile . ':' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
             $fl = explode(':', $logData->file);
-            $res .= '<span class="bug_file"> File <a href="' . static::getFileIdea($fl[0], $fl[1]) . '">' . $logData->file . '</a></span>';
+            echo '<span class="bug_file"> File <a href="' . static::getFileIdea($fl[0], (int)$fl[1]) . '">' . $logData->file . '</a></span>';
         }
-        $res .= '<div class="bug_str">' . PhpErrorCatcher::esc($logData->message) . '</div>';
+        echo '<div class="bug_str">' . Tools::esc($logData->message) . '</div>';
 
         if ($logData->trace) {
-            $res .= '<div class="trace xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body">';
+            echo '<div class="trace xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body">';
             foreach (explode(PHP_EOL, $logData->trace) as $tr) {
                 $r = explode('|', $tr);
                 if (isset($r[2])) {
                     [$tFile, $tLine] = explode(':', trim($r[1]));
-                    $res .= '<div>' . $r[0] . ' <a href="' . static::getFileIdea($tFile, $tLine) . '">' . $r[2] . '</a></div>';
+                    echo '<div>' . $r[0] . ' <a href="' . static::getFileIdea($tFile, (int)$tLine) . '">' . $r[2] . '</a></div>';
                 } else {
-                    $res .= '<div>' . PhpErrorCatcher::esc($tr) . '</div>';
+                    echo '<div>' . Tools::esc($tr) . '</div>';
                 }
             }
-            $res .= '</div></div>';
+            echo '</div></div>';
         }
 
-        $res .= '</div>';
-        return $res;
+        echo '</div>';
     }
 
-    public static function getFileIdea(string $file, int $line): string
-    {
-        return 'idea://open?url=file://' . PhpErrorCatcher::$realPath . $file . '&line=' . $line;
-    }
 }

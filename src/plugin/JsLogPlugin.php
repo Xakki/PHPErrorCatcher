@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\plugin;
 
@@ -7,13 +8,8 @@ use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 class JsLogPlugin extends BasePlugin
 {
 
-    /**
-     * If you want enable log-request, set this name
-     * @var null
-     */
-    protected $catcherLogName = 'myCatcherLog';
-    protected $catcherLogFileSeparate = true;
-    protected $level = PhpErrorCatcher::LEVEL_NOTICE;
+    protected string $catcherLogName = 'myCatcherLog';
+    protected string $level = PhpErrorCatcher::LEVEL_NOTICE;
 
     function __construct(PhpErrorCatcher $owner, $config = [])
     {
@@ -21,8 +17,6 @@ class JsLogPlugin extends BasePlugin
 
         if ($this->initGetKey && isset($_GET[$this->initGetKey])) {
             $this->initLogRequest($owner);
-//            header('Content-type: text/html; charset=UTF-8');
-//            echo $renderLog;
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['status' => 'ok']);
             exit();
@@ -32,15 +26,16 @@ class JsLogPlugin extends BasePlugin
     /**
      * Use catche.js for log error in javascript
      */
-    public function initLogRequest(PhpErrorCatcher $owner)
+    public function initLogRequest(PhpErrorCatcher $owner): void
     {
         if (!count($_POST)) {
             $_POST = json_decode(file_get_contents('php://input'), true);
         }
         if (!isset($_POST['m']) || !isset($_POST['u']) || !isset($_POST['r'])) exit();
-        $errstr = str_replace('||', PHP_EOL, $_POST['m']);
-        $size = mb_strlen(serialize((array)$errstr), '8bit');
-        if ($size > 1000) $errstr = mb_substr($errstr, 0, 1000) . '...(' . $size . 'b)...';
+        $mess = str_replace('||', PHP_EOL, $_POST['m']);
+        $size = mb_strlen(serialize((array)$mess), '8bit');
+        if ($size > 1000)
+            $mess = mb_substr($mess, 0, 1000) . '...(' . $size . 'b)...';
         $vars = [
             PhpErrorCatcher::FIELD_NO_TRICE => true,
             PhpErrorCatcher::FIELD_FILE => '',
@@ -53,8 +48,7 @@ class JsLogPlugin extends BasePlugin
         if (!empty($_POST['s'])) $vars['errStack'] = str_replace('||', PHP_EOL, $_POST['s']);
         if (!empty($_POST['l'])) $vars['line'] = $_POST['l'];
 
-        $GLOBALS['skipRenderBackTrace'] = 1;
-        $owner->log($this->level, $errstr, $vars);
+        $owner->log($this->level, $mess, $vars);
 
     }
 

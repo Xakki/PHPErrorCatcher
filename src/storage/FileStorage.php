@@ -2,28 +2,25 @@
 
 namespace Xakki\PhpErrorCatcher\storage;
 
+use DateTimeImmutable;
+use Exception;
 use Generator;
-use Traversable;
-use Xakki\PhpErrorCatcher\HttpData;
-use Xakki\PhpErrorCatcher\LogData;
-use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\dto\HttpData;
+use Xakki\PhpErrorCatcher\dto\LogData;
+use Xakki\PhpErrorCatcher\Tools;
 
 /**
  * @method string getLogPath()
- * @method string getLogDir()
  * @method string getBackUpDir()
- * @method int getLimitFileSize()
- * @method string getByDir()
- * @method string getByFile()
  */
 class FileStorage extends BaseStorage
 {
     /* Config */
-    protected $logPath = '';
-    protected $tplPath = 'Y.m/d';
-    protected $logDir = '/logsError';
-    protected $backUpDir = '/_backUp';
-    protected $limitFileSize = 10485760;
+    protected string $logPath = '';
+    protected string $tplPath = 'Y.m/d';
+    protected string $logDir = '/logsError';
+    protected string $backUpDir = '/_backUp';
+    protected int $limitFileSize = 10485760;
 
     public const FILE_EXT = 'plog';
 
@@ -36,16 +33,64 @@ class FileStorage extends BaseStorage
         }
     }
 
-    public static function getSerializeLogs(Generator $logs): string
+    public static function serializeLogs(Generator $logs): string
     {
         $data = [
-            'http' => self::getDataHttp()->__toArray(),
-            'logs' => $logs instanceof Traversable ? iterator_to_array($logs) : $logs,
+            'http' => self::createHttpData()->__toArray(),
+            'logs' => iterator_to_array($logs),
         ];
-        return str_replace(PHP_EOL, '\\n', PhpErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE));
+        return str_replace(PHP_EOL, '\\n', Tools::safeJsonEncode($data, JSON_UNESCAPED_UNICODE));
     }
 
-    public static function getDataHttp(): HttpData
+    /**
+     * @param string $line
+     * @return array<HttpData, LogData>
+     * @throws Exception
+     */
+    public static function unSerializeFileLine(string $line): array
+    {
+        $data = json_decode($line, true);
+        if (!$data['http'] || !$data['logs']) {
+            throw new Exception('Not support line');
+        }
+        return [
+            'http' => HttpData::init($data['http']),
+            'logs' => self::getGenerator($data['logs']),
+        ];
+    }
+
+    public static function getGenerator(array $logs): Generator
+    {
+        foreach ($logs as $logData) {
+            $logData = LogData::init($logData);
+            yield $logData;
+        }
+    }
+
+    public static function iterateFileLog(string $file): Generator
+    {
+        if (!file_exists($file)) {
+            throw new Exception('No file');
+        }
+
+        $fileHandle = fopen($file, "r");
+        while (!feof($fileHandle)) {
+            $line = fgets($fileHandle);
+            if (!$line) {
+                continue;
+            }
+
+            yield FileStorage::unSerializeFileLine($line);
+
+            if (Tools::isMemoryOver()) {
+                fclose($fileHandle);
+                throw new Exception('Is memory over');
+            }
+        }
+        fclose($fileHandle);
+    }
+
+    public static function createHttpData(): HttpData
     {
         $data = new HttpData();
         $serverData = $_SERVER;
@@ -72,7 +117,7 @@ class FileStorage extends BaseStorage
         if (!empty($serverData['HTTP_USER_AGENT'])) {
             $data->userAgent = substr($serverData['HTTP_USER_AGENT'], 0, 500);
         }
-        if (PhpErrorCatcher::isMemoryOver()) {
+        if (Tools::isMemoryOver()) {
             $data->overMemory = true;
         }
         return $data;
@@ -82,10 +127,10 @@ class FileStorage extends BaseStorage
      * @param LogData[] $log
      * @return void
      */
-    private function putData(Generator $log): void
+    private function putData(Generator $log): bool
     {
         $lastSlash = strrpos($this->tplPath, '/');
-        $date = \DateTimeImmutable::createFromFormat('U', time());
+        $date = DateTimeImmutable::createFromFormat('U', time());
         $fileName = $date->format(substr($this->tplPath, 0, $lastSlash));
 
         $fileName = rtrim($this->logPath, '/') . '/' . trim($this->logDir, '/') . '/' . $fileName;
@@ -116,16 +161,22 @@ class FileStorage extends BaseStorage
                     $flagNew = false;
                 }
 //                else {
-                    //  href="' . $this->getFileUrl($preiosFile) . '"
+                //  href="' . $this->getFileUrl($preiosFile) . '"
 //                    $fileLog = '<a>Part # ' . $i . '. Previos file was to big</a><hr/>' . PHP_EOL . $fileLog;
 //                }
             } else {
                 $flagNew = false;
             }
         }
-        file_put_contents($fileName, $this->getSerializeLogs($log) . PHP_EOL, FILE_APPEND);
+        file_put_contents($fileName, $this->serializeLogs($log) . PHP_EOL, FILE_APPEND);
         if ($flagNew) {
             chmod($fileName, 0777);
         }
+        return true;
+    }
+
+    public function checkIsBackUp(string $file): bool
+    {
+        return strpos($file, $this->getLogPath() . $this->getBackUpDir()) !== false;
     }
 }

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
 
@@ -10,10 +11,4 @@ abstract class BaseStorage extends Base
     {
         return [];
     }
-//    function __construct(PhpErrorCatcher $owner, $config = []) {
-//        parent::__construct($owner, $config);
-//
-//    }
-
-//    abstract function __destruct();
 }
