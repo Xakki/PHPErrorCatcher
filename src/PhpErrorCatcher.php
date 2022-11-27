@@ -7,6 +7,11 @@ use Psr\Log\LoggerInterface;
 use Stringable;
 use Xakki\PhpErrorCatcher\viewer\FileViewer;
 
+use xakki\phperrorcatcher\contract\CacheInterface;
+use Psr\Log\LoggerInterface;
+use Stringable;
+use xakki\phperrorcatcher\viewer\FileViewer;
+
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 if (!defined('STDIN')) {
