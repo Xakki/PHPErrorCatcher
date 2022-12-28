@@ -1,0 +1,8 @@
+parameters:
+    parallel:
+        processTimeout: 600.0
+    level: 4
+    paths:
+        - src
+    excludePaths:
+        - src/connector/

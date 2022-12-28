@@ -1,24 +1,22 @@
 <?php
+declare(strict_types=1);
 
-namespace xakki\phperrorcatcher\viewer;
+namespace Xakki\PhpErrorCatcher\viewer;
 
+use Xakki\PhpErrorCatcher\Base;
 
 /**
- * Class BaseViewer
- * @package xakki\phperrorcatcher\viewer
- * @method string getInitGetKey
+ * @method string getInitGetKey()
  */
-abstract class BaseViewer extends \xakki\phperrorcatcher\Base
+abstract class BaseViewer extends Base
 {
+    protected string $initGetKey;
 
-    protected $initGetKey;
-
-    public function getHomeUrl($end = '/')
+    public function getHomeUrl(string $end = '/'): string
     {
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
         return $url['path'] . '?' . $this->getInitGetKey() . '=' . $end;
     }
 
-    abstract public function renderAllLogs($httpData, $logDatas);
 }

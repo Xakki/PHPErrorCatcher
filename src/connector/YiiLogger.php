@@ -1,34 +1,24 @@
 <?php
 
-namespace xakki\phperrorcatcher\connector;
+namespace Xakki\PhpErrorCatcher\connector;
 
-use \xakki\phperrorcatcher\PHPErrorCatcher;
+use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use yii\log\Logger;
 
-/**
- * Class Logger
- * @package xakki\phperrorcatcher\yii2
- *
- * Catch all logs
- *
- * Add to config
- *    Yii::$container->set('yii\log\Logger', '\xakki\phperrorcatcher\connector\YiiLogger');
- *    $config['bootstrap'][] = 'log';
- */
-class YiiLogger extends \yii\log\Logger
+class YiiLogger extends Logger
 {
     public $targets = [];
     static $toMylevels = [
-        self::LEVEL_ERROR => PHPErrorCatcher::LEVEL_ERROR,
-        self::LEVEL_WARNING => PHPErrorCatcher::LEVEL_WARNING,
-        self::LEVEL_INFO => PHPErrorCatcher::LEVEL_INFO,
-        self::LEVEL_TRACE => PHPErrorCatcher::LEVEL_DEBUG,
+        self::LEVEL_ERROR => PhpErrorCatcher::LEVEL_ERROR,
+        self::LEVEL_WARNING => PhpErrorCatcher::LEVEL_WARNING,
+        self::LEVEL_INFO => PhpErrorCatcher::LEVEL_INFO,
+        self::LEVEL_TRACE => PhpErrorCatcher::LEVEL_DEBUG,
     ];
 
     public function log($message, $level, $category = '')
     {
         if (isset(self::$toMylevels[$level])) {
-            return PHPErrorCatcher::logger(self::$toMylevels[$level], $message, [], ['category' => $category]);
+            PhpErrorCatcher::init()->log(self::$toMylevels[$level], $message, ['category' => $category]);
         }
-        return false;
     }
 }

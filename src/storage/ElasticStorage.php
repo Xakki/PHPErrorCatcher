@@ -1,80 +1,84 @@
 <?php
+declare(strict_types=1);
 
-namespace xakki\phperrorcatcher\storage;
+namespace Xakki\PhpErrorCatcher\storage;
 
 use Generator;
-use xakki\phperrorcatcher\LogData;
-use xakki\phperrorcatcher\PHPErrorCatcher;
+use Xakki\PhpErrorCatcher\dto\LogData;
+use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\Tools;
 
 class ElasticStorage extends BaseStorage
 {
+    protected string $index = 'phplogs';
+    protected string $file = ''; //'/var/log/app.log'    // OR fo filebeat
+    protected string $url = '';//http://localhost:9200
+    protected string $auth = ''; // user:pass
 
-    protected $index = 'phplogs';
-    protected $url = '';//http://localhost:9200
-    protected $file = null; //'/var/log/app.log'    // OR fo filebeat
-    protected $auth = ''; // user:pass
-
-    function __destruct()
+    public function __destruct()
     {
-        if ($this->_owner->needSaveLog()) {
-//            $this->initLogIndex();
-            if ($this->putData($this->_owner->getDataLogsGenerator(), $_SERVER)) {
-                $this->_owner->successSaveLog();
+        if ($this->owner->needSaveLog()) {
+
+            if ($this->putData($this->owner->getDataLogsGenerator(), $_SERVER)) {
+                $this->owner->successSaveLog();
             }
         }
     }
 
-    public function getViewMenu()
+    public function getViewMenu(): array
     {
         $menu = [];
-        if ($this->url)
+        if ($this->url) {
+            // Run actionIndexMapping()
             $menu['IndexMapping'] = 'Elastic Mapping';
+        }
         return $menu;
     }
 
     /**
-     * @param Generator|LogData[] $logData
+     * @param Generator|LogData[] $logsData
      * @return bool
      */
-    protected function putData($logsData, $serverData)
+    protected function putData(Generator $logsData, array $serverData): bool
     {
         if ($this->file && substr($this->file, 0, 1) == '/') {
             if (!$this->mkdir(dirname($this->file))) {
                 return false;
             }
-            foreach ($logsData as $key => $logData) {
-                file_put_contents($this->file,
-                    PHPErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND);
+            foreach ($logsData as $logData) {
+                file_put_contents(
+                    $this->file,
+                    Tools::safeJsonEncode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE) . PHP_EOL,
+                    FILE_APPEND
+                );
             }
             return true;
         }
 
-        if (!$this->url) return false;
+        if (!$this->url) {
+            return false;
+        }
 
         $data = [];
-        $meta = json_encode(['index' => ["_index" => $this->index.'-'.date('Y-m')]]);
+        $meta = json_encode(['index' => ["_index" => $this->index . '-' . date('Y-m')]]);
 //        $meta = '{"index":{}}';
-        foreach ($logsData as $key => $logData) {
+        foreach ($logsData as $logData) {
             $data[] = $meta;
-            $data[] = PHPErrorCatcher::safe_json_encode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
+            $data[] = Tools::safeJsonEncode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
         }
         // . '/' . $this->index . '/' . $this->type
         return $this->sendDataToElastic(implode(PHP_EOL, $data) . PHP_EOL, $this->url . '/_bulk', 'POST');
     }
 
-    public function getParceUserAgent($user_agent)
+    public function getParceUserAgent(string $userAgent): array
     {
         return [
-            'original' => $user_agent
+            'original' => $userAgent,
         ];
     }
 
-    /**
-     * @param LogData $logData
-     */
-    protected function collectLogData($logData, $serverData)
+    protected function collectLogData(LogData $logData, array $serverData): array
     {
-
         $data = [
             "@timestamp" => $logData->timestamp,
             "message" => $logData->message,
@@ -82,52 +86,64 @@ class ElasticStorage extends BaseStorage
             'type' => $logData->type, // exception, trigger, log, fatal
         ];
 
-        if ($logData->tags)
+        if ($logData->tags) {
             $data['tags'] = $logData->tags;
-        if ($logData->fields)
+        }
+        if ($logData->fields) {
             $data['fields'] = $logData->fields;
-        if ($logData->trace)
+        }
+        if ($logData->trace) {
             $data['trace'] = $logData->trace;
-        if ($logData->file)
+        }
+        if ($logData->file) {
             $data['file'] = $logData->file;
+        }
 
-        if (!empty($serverData['REMOTE_ADDR']))
+        if (!empty($serverData['REMOTE_ADDR'])) {
             $data['http']['ip_addr'] = $serverData['REMOTE_ADDR'];
-        if (!empty($serverData['HTTP_HOST']))
+        }
+        if (!empty($serverData['HTTP_HOST'])) {
             $data['http']['host'] = $serverData['HTTP_HOST'];
-        if (!empty($serverData['REQUEST_METHOD']))
+        }
+        if (!empty($serverData['REQUEST_METHOD'])) {
             $data['http']['method'] = $serverData['REQUEST_METHOD'];
-        if (!empty($serverData['REQUEST_URI']))
+        }
+        if (!empty($serverData['REQUEST_URI'])) {
             $data['http']['url'] = $serverData['REQUEST_URI'];
-        if (!empty($serverData['HTTP_REFERER']))
+        }
+        if (!empty($serverData['HTTP_REFERER'])) {
             $data['http']['referrer'] = $serverData['HTTP_REFERER'];
-        if (!empty($serverData['REQUEST_SCHEME']))
+        }
+        if (!empty($serverData['REQUEST_SCHEME'])) {
             $data['http']['scheme'] = $serverData['REQUEST_SCHEME'];
-        if (!empty($serverData['HTTP_USER_AGENT']))
+        }
+        if (!empty($serverData['HTTP_USER_AGENT'])) {
             $data['user_agent'] = $this->getParceUserAgent($serverData['HTTP_USER_AGENT']);
-        if (!empty($serverData['argv']))
+        }
+        if (!empty($serverData['argv'])) {
             $data['http']['argv'] = $serverData['argv'];
+        }
         return $data;
     }
 
-    public function actionIndexMapping()
+    public function actionIndexMapping(): string
     {
         $data = [
             'version' => 1,
             'priority' => 1,
             '_meta' => [
-                'description' => 'PhpErrorCatcher v'.PHPErrorCatcher::VERSION
+                'description' => 'PhpErrorCatcher v' . PhpErrorCatcher::VERSION,
             ],
-            "index_patterns" => [$this->index.'-*'],
+            "index_patterns" => [$this->index . '-*'],
             'template' => [
                 'settings' => [
                     'index' => [
 //                        'lifecycle' => ['name' => 'logs'],
                         'refresh_interval' => '5s',
                         'query' => [
-                            'default_field' => ['message']
-                        ]
-                    ]
+                            'default_field' => ['message'],
+                        ],
+                    ],
                 ],
                 "mappings" => [
                     "dynamic_templates" => [
@@ -136,14 +152,14 @@ class ElasticStorage extends BaseStorage
                                 "path_match" => "fields.*",
                                 "match_mapping_type" => "string",
                                 "mapping" => [
-                                    "type" => "keyword"
-                                ]
-                            ]
+                                    "type" => "keyword",
+                                ],
+                            ],
                         ],
                     ],
                     'properties' => [
                         "@timestamp" => [
-                            "type" => "date"
+                            "type" => "date",
                         ],
                         'level' => ['type' => 'keyword'],
                         'type' => ['type' => 'keyword'],
@@ -154,78 +170,78 @@ class ElasticStorage extends BaseStorage
                         "fields" => [
                             "properties" => [
                                 "env" => [
-                                    "type" => "keyword"
-                                ]
-                            ]
+                                    "type" => "keyword",
+                                ],
+                            ],
                         ],
                         "tags" => [
                             "type" => "keyword",
-                            'boost' => 2
+                            'boost' => 2,
                         ],
                         "http" => [
                             "properties" => [
                                 "ip_addr" => [
-                                    "type" => "ip"
+                                    "type" => "ip",
                                 ],
                                 "host" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 128
+                                    "ignore_above" => 128,
                                 ],
                                 "method" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 8
+                                    "ignore_above" => 8,
                                 ],
                                 "url" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 1024
+                                    "ignore_above" => 1024,
                                 ],
                                 "referrer" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 1024
+                                    "ignore_above" => 1024,
                                 ],
                                 "scheme" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 8
-                                ]
-                            ]
+                                    "ignore_above" => 8,
+                                ],
+                            ],
                         ],
                         'user_agent' => [
                             'properties' => [
                                 "device" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 32
+                                    "ignore_above" => 32,
                                 ],
                                 "name" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 32
+                                    "ignore_above" => 32,
                                 ],
                                 "original" => [
                                     "type" => "keyword",
                                     "ignore_above" => 256,
-                                    'index' => false
+                                    'index' => false,
                                 ],
                                 "os" => [
                                     "properties" => [
                                         "full" => [
                                             "type" => "keyword",
                                             "ignore_above" => 32,
-                                            'index' => false
+                                            'index' => false,
                                         ],
                                         "name" => [
                                             "type" => "keyword",
-                                            "ignore_above" => 16
+                                            "ignore_above" => 16,
                                         ],
                                         "version" => [
                                             "type" => "keyword",
-                                            "ignore_above" => 8
-                                        ]
-                                    ]
+                                            "ignore_above" => 8,
+                                        ],
+                                    ],
                                 ],
                                 "version" => [
                                     "type" => "keyword",
-                                    "ignore_above" => 32
-                                ]
-                            ]
+                                    "ignore_above" => 32,
+                                ],
+                            ],
                         ],
                         "message" => [
                             "type" => "text",
@@ -234,26 +250,26 @@ class ElasticStorage extends BaseStorage
                         "trace" => [
                             "type" => "text",
                             "norms" => false,
-                            'index' => false
+                            'index' => false,
                         ],
                         "count" => [
                             "type" => "integer",
                         ],
-                    ]
-                ]
-            ]
+                    ],
+                ],
+            ],
         ];
-        if($this->sendDataToElastic($data, $this->url . '/_index_template/phplogs', 'PUT'))
+        if ($this->sendDataToElastic($data, $this->url . '/_index_template/phplogs', 'PUT')) {
             return 'Success update mapping';
-        else
+        } else {
             return 'Error update mapping';
+        }
     }
 
-    protected function sendDataToElastic($data, $url, $method)
+    protected function sendDataToElastic(mixed $data, string $url, string $method): bool
     {
-
         if (!is_string($data)) {
-            $data = PHPErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE);
+            $data = Tools::safeJsonEncode($data, JSON_UNESCAPED_UNICODE);
         }
 
         $params = [
@@ -261,20 +277,20 @@ class ElasticStorage extends BaseStorage
             CURLOPT_TIMEOUT => 3,
             CURLOPT_VERBOSE => false,
             CURLOPT_HTTPHEADER => [
-                'Content-Type: ' . ((strpos($url, '/_bulk')) ? 'application/x-ndjson' : 'application/json'),
+                'Content-Type: ' . (strpos($url, '/_bulk') ? 'application/x-ndjson' : 'application/json'),
                 'Accept: application/json',
             ],
             CURLOPT_POSTFIELDS => $data,
             CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_USERAGENT => 'PHPErrorCatcher v0.2',
-            CURLOPT_HEADER => false,  //не включать заголовки ответа сервера в вывод
+            CURLOPT_USERAGENT => 'PhpErrorCatcher v0.2',
+            CURLOPT_HEADER => false, //не включать заголовки ответа сервера в вывод
             CURLOPT_RETURNTRANSFER => true, //вернуть ответ сервера в виде строки
         ];
         if ($this->auth) {
             $params[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
             $params[CURLOPT_USERPWD] = $this->auth;
         }
-        if ($this->_owner->get('debugMode')) {
+        if ($this->owner::$debugMode) {
             $params[CURLINFO_HEADER_OUT] = true;
             $params[CURLOPT_VERBOSE] = true;
 //            $params[CURLOPT_HEADER] = true;
@@ -287,7 +303,7 @@ class ElasticStorage extends BaseStorage
         }
         $text = curl_exec($ch);
         $info = curl_getinfo($ch);
-        $isErr = ($info['http_code'] != 200);
+        $isErr = $info['http_code'] != 200;
         if (!$isErr) {
             $res = json_decode($text, true);
             if ($res) {
@@ -300,17 +316,13 @@ class ElasticStorage extends BaseStorage
         }
 
         if ($isErr) {
-            if ($this->_owner->get('debugMode')) {
-                print_r('<pre>');
-                print_r($text);
-                print_r(json_decode($text, true));
-                print_r($info);
-                print_r('</pre>');
-            }
-            $this->_owner->error($text, ['elastic'], ['http_code' => $info['http_code'], ['trace' => []]]);
+            $this->owner->error($text . PHP_EOL . json_encode($info), [
+                PhpErrorCatcher::FIELD_NO_TRICE => true,
+                PhpErrorCatcher::FIELD_FILE => '',
+                'elastic'
+            ]);
             return false;
         }
         return true;
     }
-
 }
