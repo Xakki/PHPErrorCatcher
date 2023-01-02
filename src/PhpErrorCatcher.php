@@ -708,7 +708,12 @@ class PhpErrorCatcher implements LoggerInterface
     /***************************************************/
 
     /**
-     * Распечатка трейса
+     * Trace print
+     * @param mixed|null $trace
+     * @param int $start
+     * @param int $limit
+     * @param array $lineExclude
+     * @return string
      */
     public function renderDebugTrace(mixed $trace = null, int $start = 0, int $limit = 10, array $lineExclude = []): string
     {
@@ -846,14 +851,14 @@ class PhpErrorCatcher implements LoggerInterface
 
     public function debug($message, array $context = []): void
     {
-        if (!static::$debugMode) {
-            return;
-        }
         $this->log(self::LEVEL_DEBUG, $message, $context);
     }
 
     public function log($level, mixed $message, array $context = []): void
     {
+        if (!static::$debugMode && $level === self::LEVEL_DEBUG) {
+            return;
+        }
         if ($this->count >= 100) {
             if ($this->count == 100) {
                 echo '<p>To many Logs</p>';

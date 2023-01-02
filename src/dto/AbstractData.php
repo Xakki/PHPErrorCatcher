@@ -5,9 +5,9 @@ namespace Xakki\PhpErrorCatcher\dto;
 
 class AbstractData
 {
-    public static function init(array $data): self
+    public static function init(array $data): static
     {
-        $logData = new self();
+        $logData = new static();
         foreach ($data as $prop => $val) {
             $logData->{$prop} = $val;
         }

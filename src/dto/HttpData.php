@@ -13,6 +13,7 @@ class HttpData extends AbstractData
     public ?string $scheme;
     public ?string $userAgent;
     public bool $overMemory = false;
+    public string $shell = '';
 
     public function __toArray(): array
     {

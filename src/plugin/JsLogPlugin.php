@@ -8,7 +8,7 @@ use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 class JsLogPlugin extends BasePlugin
 {
 
-    protected string $catcherLogName = 'myCatcherLog';
+    protected string $catcherLogName;
     protected string $level = PhpErrorCatcher::LEVEL_NOTICE;
 
     function __construct(PhpErrorCatcher $owner, $config = [])
@@ -42,11 +42,12 @@ class JsLogPlugin extends BasePlugin
             'ver' => $_POST['v'],
             'url' => $_POST['u'],
             'referrer' => $_POST['r'],
+            'userAgent' => isset($_POST['ua']) ? $_POST['ua'] : '',
             'js',
             $this->catcherLogName,
         ];
-        if (!empty($_POST['s'])) $vars['errStack'] = str_replace('||', PHP_EOL, $_POST['s']);
-        if (!empty($_POST['l'])) $vars['line'] = $_POST['l'];
+        if (!empty($_POST['s'])) $vars[PHPErrorCatcher::FIELD_TRICE] = str_replace('||', PHP_EOL, $_POST['s']);
+        if (!empty($_POST['l'])) $vars[PHPErrorCatcher::FIELD_FILE] = $_POST['l'];
 
         $owner->log($this->level, $mess, $vars);
 
