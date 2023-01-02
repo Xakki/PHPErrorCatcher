@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
 
@@ -10,10 +9,10 @@ use Xakki\PhpErrorCatcher\Tools;
 
 class ElasticStorage extends BaseStorage
 {
-    protected string $index = 'phplogs';
-    protected string $file = ''; //'/var/log/app.log'    // OR fo filebeat
-    protected string $url = '';//http://localhost:9200
-    protected string $auth = ''; // user:pass
+    protected $index = 'phplogs';
+    protected $file = ''; //'/var/log/app.log'    // OR fo filebeat
+    protected $url = '';//http://localhost:9200
+    protected $auth = ''; // user:pass
 
     public function __destruct()
     {
@@ -25,7 +24,10 @@ class ElasticStorage extends BaseStorage
         }
     }
 
-    public function getViewMenu(): array
+    /**
+     * @return array
+     */
+    public function getViewMenu()
     {
         $menu = [];
         if ($this->url) {
@@ -39,7 +41,7 @@ class ElasticStorage extends BaseStorage
      * @param Generator|LogData[] $logsData
      * @return bool
      */
-    protected function putData(Generator $logsData, array $serverData): bool
+    protected function putData(Generator $logsData, array $serverData)
     {
         if ($this->file && substr($this->file, 0, 1) == '/') {
             if (!$this->mkdir(dirname($this->file))) {
@@ -70,14 +72,23 @@ class ElasticStorage extends BaseStorage
         return $this->sendDataToElastic(implode(PHP_EOL, $data) . PHP_EOL, $this->url . '/_bulk', 'POST');
     }
 
-    public function getParceUserAgent(string $userAgent): array
+    /**
+     * @param string $userAgent
+     * @return string[]
+     */
+    public function getParceUserAgent($userAgent)
     {
         return [
             'original' => $userAgent,
         ];
     }
 
-    protected function collectLogData(LogData $logData, array $serverData): array
+    /**
+     * @param LogData $logData
+     * @param array $serverData
+     * @return array
+     */
+    protected function collectLogData(LogData $logData, array $serverData)
     {
         $data = [
             "@timestamp" => $logData->timestamp,
@@ -126,7 +137,10 @@ class ElasticStorage extends BaseStorage
         return $data;
     }
 
-    public function actionIndexMapping(): string
+    /**
+     * @return string
+     */
+    public function actionIndexMapping()
     {
         $data = [
             'version' => 1,
@@ -266,7 +280,14 @@ class ElasticStorage extends BaseStorage
         }
     }
 
-    protected function sendDataToElastic(mixed $data, string $url, string $method): bool
+    /**
+     * @param mixed $data
+     * @param string $url
+     * @param string $method
+     * @return bool
+     * @throws \Exception
+     */
+    protected function sendDataToElastic($data, $url, $method)
     {
         if (!is_string($data)) {
             $data = Tools::safeJsonEncode($data, JSON_UNESCAPED_UNICODE);
@@ -290,7 +311,7 @@ class ElasticStorage extends BaseStorage
             $params[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
             $params[CURLOPT_USERPWD] = $this->auth;
         }
-        if ($this->owner::$debugMode) {
+        if (PhpErrorCatcher::$debugMode) {
             $params[CURLINFO_HEADER_OUT] = true;
             $params[CURLOPT_VERBOSE] = true;
 //            $params[CURLOPT_HEADER] = true;

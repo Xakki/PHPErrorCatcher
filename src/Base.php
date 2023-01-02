@@ -4,7 +4,10 @@ namespace Xakki\PhpErrorCatcher;
 
 abstract class Base
 {
-    protected PhpErrorCatcher $owner;
+    /**
+     * @var PhpErrorCatcher
+     */
+    protected $owner;
 
     public function __construct(PhpErrorCatcher $owner, $config = [])
     {
@@ -17,7 +20,7 @@ abstract class Base
 //
 //    }
 
-    public function applyConfig(array $config): void
+    public function applyConfig(array $config)
     {
         foreach ($config as $key => $value) {
             if (property_exists($this, $key)) {
@@ -38,7 +41,11 @@ abstract class Base
         }
     }
 
-    public function mkdir(string $fileName): bool
+    /**
+     * @param string $fileName
+     * @return bool
+     */
+    public function mkdir($fileName)
     {
         if (file_exists($fileName)) {
             return true;

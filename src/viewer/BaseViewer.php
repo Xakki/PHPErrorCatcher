@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\viewer;
 
@@ -10,9 +9,16 @@ use Xakki\PhpErrorCatcher\Base;
  */
 abstract class BaseViewer extends Base
 {
-    protected string $initGetKey;
+    /**
+     * @var string
+     */
+    protected $initGetKey;
 
-    public function getHomeUrl(string $end = '/'): string
+    /**
+     * @param string $end
+     * @return string
+     */
+    public function getHomeUrl($end = '/')
     {
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);

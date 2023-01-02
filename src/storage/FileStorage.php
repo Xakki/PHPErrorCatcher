@@ -16,13 +16,13 @@ use Xakki\PhpErrorCatcher\Tools;
 class FileStorage extends BaseStorage
 {
     /* Config */
-    protected string $logPath = '';
-    protected string $tplPath = 'Y.m/d';
-    protected string $logDir = '/logsError';
-    protected string $backUpDir = '/_backUp';
-    protected int $limitFileSize = 10485760;
+    protected $logPath = '';
+    protected $tplPath = 'Y.m/d';
+    protected $logDir = '/logsError';
+    protected $backUpDir = '/_backUp';
+    protected $limitFileSize = 10485760;
 
-    public const FILE_EXT = 'plog';
+    const FILE_EXT = 'plog';
 
     public function __destruct()
     {
@@ -33,7 +33,12 @@ class FileStorage extends BaseStorage
         }
     }
 
-    public static function serializeLogs(Generator $logs): string
+    /**
+     * @param Generator $logs
+     * @return string
+     * @throws Exception
+     */
+    public static function serializeLogs(Generator $logs)
     {
         $data = [
             'http' => self::createHttpData()->__toArray(),
@@ -47,7 +52,7 @@ class FileStorage extends BaseStorage
      * @return array<HttpData, LogData>
      * @throws Exception
      */
-    public static function unSerializeFileLine(string $line): array
+    public static function unSerializeFileLine($line)
     {
         $data = json_decode($line, true);
         if (!$data['http'] || !$data['logs']) {
@@ -59,7 +64,11 @@ class FileStorage extends BaseStorage
         ];
     }
 
-    public static function getGenerator(array $logs): Generator
+    /**
+     * @param array $logs
+     * @return Generator
+     */
+    public static function getGenerator(array $logs)
     {
         foreach ($logs as $logData) {
             $logData = LogData::init($logData);
@@ -67,7 +76,12 @@ class FileStorage extends BaseStorage
         }
     }
 
-    public static function iterateFileLog(string $file): Generator
+    /**
+     * @param string $file
+     * @return Generator
+     * @throws Exception
+     */
+    public static function iterateFileLog($file)
     {
         if (!file_exists($file)) {
             throw new Exception('No file');
@@ -90,7 +104,10 @@ class FileStorage extends BaseStorage
         fclose($fileHandle);
     }
 
-    public static function createHttpData(): HttpData
+    /**
+     * @return HttpData
+     */
+    public static function createHttpData()
     {
         $data = new HttpData();
         $serverData = $_SERVER;
@@ -125,9 +142,9 @@ class FileStorage extends BaseStorage
 
     /**
      * @param LogData[] $log
-     * @return void
+     * @return bool
      */
-    private function putData(Generator $log): bool
+    private function putData(Generator $log)
     {
         $lastSlash = strrpos($this->tplPath, '/');
         $date = DateTimeImmutable::createFromFormat('U', time());
@@ -175,7 +192,11 @@ class FileStorage extends BaseStorage
         return true;
     }
 
-    public function checkIsBackUp(string $file): bool
+    /**
+     * @param string $file
+     * @return bool
+     */
+    public function checkIsBackUp($file)
     {
         return strpos($file, $this->getLogPath() . $this->getBackUpDir()) !== false;
     }

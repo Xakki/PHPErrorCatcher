@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\plugin;
 
@@ -8,8 +7,8 @@ use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 class JsLogPlugin extends BasePlugin
 {
 
-    protected string $catcherLogName = 'myCatcherLog';
-    protected string $level = PhpErrorCatcher::LEVEL_NOTICE;
+    protected $catcherLogName = 'myCatcherLog';
+    protected $level = PhpErrorCatcher::LEVEL_NOTICE;
 
     function __construct(PhpErrorCatcher $owner, $config = [])
     {
@@ -26,7 +25,7 @@ class JsLogPlugin extends BasePlugin
     /**
      * Use catche.js for log error in javascript
      */
-    public function initLogRequest(PhpErrorCatcher $owner): void
+    public function initLogRequest(PhpErrorCatcher $owner)
     {
         if (!count($_POST)) {
             $_POST = json_decode(file_get_contents('php://input'), true);
@@ -42,6 +41,7 @@ class JsLogPlugin extends BasePlugin
             'ver' => $_POST['v'],
             'url' => $_POST['u'],
             'referrer' => $_POST['r'],
+            'userAgent' => isset($_POST['ua']) ? $_POST['ua'] : '',
             'js',
             $this->catcherLogName,
         ];

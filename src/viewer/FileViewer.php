@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\viewer;
 
@@ -13,13 +12,25 @@ use Xakki\PhpErrorCatcher\Tools;
 
 class FileViewer extends BaseViewer
 {
-    public const VERSION = '0.2';
+    const VERSION = '0.2';
 
-    protected string $initGetKey;
-    protected static string $realPath = '';
-    protected bool $allowBackUp = true;
+    /**
+     * @var string
+     */
+    protected $initGetKey;
+    /**
+     * @var string
+     */
+    protected static $realPath = '';
+    /**
+     * @var bool
+     */
+    protected $allowBackUp = true;
 
-    public array $errorListView = [
+    /**
+     * @var array|array[]
+     */
+    public $errorListView = [
         PhpErrorCatcher::LEVEL_CRITICAL => [
             'type' => '[Critical]',
             'color' => 'red',
@@ -57,7 +68,10 @@ class FileViewer extends BaseViewer
         ],
     ];
 
-    protected FileStorage $fileStorage;
+    /**
+     * @var FileStorage|\Xakki\PhpErrorCatcher\storage\BaseStorage
+     */
+    protected $fileStorage;
 
     protected $idePath;
 
@@ -86,7 +100,7 @@ class FileViewer extends BaseViewer
     /**
      * Просмотр логов
      */
-    protected function renderView(): void
+    protected function renderView()
     {
         $url = str_replace([
             '\\',
@@ -118,7 +132,7 @@ class FileViewer extends BaseViewer
         if ($file == 'PHPINFO') {
             phpinfo();
         } elseif ($file == 'storage') {
-            [$st, $fn] = explode('/', $_GET['fname']);
+            list($st, $fn) = explode('/', $_GET['fname']);
             echo '<p>';
             if ($this->owner->getStorage($st) && method_exists($this->owner->getStorage($st), 'action' . $fn)) {
                 echo call_user_func([$this->owner->getStorage($st), 'action' . $fn]);
@@ -168,17 +182,19 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * рендер заголовка HTML
+     * @param string $file
+     * @return void
      */
-    protected function renderViewHead(string $file): void
+    protected function renderViewHead($file)
     {
         include __DIR__ . '/file/tpl.php';
     }
 
     /**
-     * Просмотр Директории логов
+     * @param string $path
+     * @return array
      */
-    protected function viewGetDirList(string $path = ''): array
+    protected function viewGetDirList($path = '')
     {
         $dirList1 = $dirList2 = [];
         $path = trim($path, '/.');
@@ -258,7 +274,7 @@ class FileViewer extends BaseViewer
     /**
      * Рендер директории логов
      */
-    protected function renderViewDirList(array $dirList): void
+    protected function renderViewDirList(array $dirList)
     {
         echo '<table class="table table-striped" style="width: auto;">';
         echo '<thead>
@@ -332,8 +348,10 @@ class FileViewer extends BaseViewer
 
     /**
      * Бекапи логи
+     * @param string $dir
+     * @return void
      */
-    protected function renderViewCreateBackUpDir(string $dir): void
+    protected function renderViewCreateBackUpDir($dir)
     {
         if (!is_dir($dir)) {
             echo 'Is not Dir';
@@ -359,8 +377,10 @@ class FileViewer extends BaseViewer
 
     /**
      * Хлебные крошки
+     * @param string $url
+     * @return void
      */
-    protected function renderViewBreadCrumb(string $url): void
+    protected function renderViewBreadCrumb($url)
     {
         $temp = preg_split('/\//', $url, -1, PREG_SPLIT_NO_EMPTY);
         $basePath = $fullPath = $this->getHomeUrl('');
@@ -373,7 +393,10 @@ class FileViewer extends BaseViewer
         echo '<nav aria-label="breadcrumb"><ol class="breadcrumb">' . $ctr . '</ol></nav>';
     }
 
-    protected function getPreviosUrl(): string
+    /**
+     * @return string
+     */
+    protected function getPreviosUrl()
     {
         $temp = preg_split('/\//', $_GET[$this->initGetKey], -1, PREG_SPLIT_NO_EMPTY);
         array_pop($temp);
@@ -382,7 +405,11 @@ class FileViewer extends BaseViewer
 
     /*********************************/
 
-    protected function renderFileContent(string $file): void
+    /**
+     * @param string $file
+     * @return void
+     */
+    protected function renderFileContent($file)
     {
         // if ()
         // mime_content_type
@@ -400,13 +427,21 @@ class FileViewer extends BaseViewer
         }
     }
 
-    protected function getFileUrl(string $realFilePath): string
+    /**
+     * @param string $realFilePath
+     * @return string
+     */
+    protected function getFileUrl($realFilePath)
     {
         $realFilePath = str_replace($this->fileStorage->getLogPath(), '', $realFilePath);
         return $this->getHomeUrl() . ltrim($realFilePath, '/');
     }
 
-    protected function renderJsonLogs(string $file): void
+    /**
+     * @param string $file
+     * @return void
+     */
+    protected function renderJsonLogs($file)
     {
         try {
             foreach (FileStorage::iterateFileLog($file) as $r) {
@@ -417,7 +452,12 @@ class FileViewer extends BaseViewer
         }
     }
 
-    protected static function getFileIdea(string $file, int $line): string
+    /**
+     * @param string $file
+     * @param int $line
+     * @return string
+     */
+    protected static function getFileIdea($file, $line)
     {
         return 'idea://open?url=file://' . self::$realPath . $file . '&line=' . $line;
     }
@@ -434,7 +474,7 @@ class FileViewer extends BaseViewer
      * @param LogData[]|Generator $logs
      * @return void
      */
-    public static function renderAllLogs(HttpData $httpData, Generator $logs): void
+    public static function renderAllLogs(HttpData $httpData, Generator $logs)
     {
         //        $this->_owner->setSafeParams();
         //        $profilerUrlTag = '';
@@ -466,7 +506,7 @@ class FileViewer extends BaseViewer
         echo '</div>';
     }
 
-    public static function renderItemLog(LogData $logData): void
+    public static function renderItemLog(LogData $logData)
     {
         $dt = explode('.', (string)$logData->timestamp);
         echo '<div class="bug_item bug_level_' . $logData->level . '">'
@@ -494,7 +534,7 @@ class FileViewer extends BaseViewer
             foreach (explode(PHP_EOL, $logData->trace) as $tr) {
                 $r = explode('|', $tr);
                 if (isset($r[2])) {
-                    [$tFile, $tLine] = explode(':', trim($r[1]));
+                    list($tFile, $tLine) = explode(':', trim($r[1]));
                     echo '<div>' . $r[0] . ' <a href="' . static::getFileIdea($tFile, (int)$tLine) . '">' . $r[2] . '</a></div>';
                 } else {
                     echo '<div>' . Tools::esc($tr) . '</div>';

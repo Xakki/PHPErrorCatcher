@@ -1,11 +1,14 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\dto;
 
 class AbstractData
 {
-    public static function init(array $data): self
+    /**
+     * @param array $data
+     * @return static
+     */
+    public static function init(array $data)
     {
         $logData = new self();
         foreach ($data as $prop => $val) {

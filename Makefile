@@ -27,3 +27,6 @@ test:
 
 phpstan:
 	$(docker) composer phpstan
+
+psalm:
+	$(docker) vendor/bin/psalm

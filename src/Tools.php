@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher;
 
@@ -7,7 +6,7 @@ use Exception;
 
 class Tools
 {
-    public const COLOR_GREEN = '0;32',
+    const COLOR_GREEN = '0;32',
         COLOR_GRAY = '0;37',
         COLOR_GRAY2 = '1;37',
         COLOR_YELLOW = '1;33',
@@ -17,7 +16,12 @@ class Tools
         COLOR_BLUE = '0;34',
         COLOR_BLUE2 = '1;36';
 
-    public static function cliColor(string $text, string $colorId): string
+    /**
+     * @param string $text
+     * @param string $colorId
+     * @return string
+     */
+    public static function cliColor($text, $colorId)
     {
         if (!isset($_SERVER['TERM'])) {
             return $text;
@@ -37,12 +41,19 @@ class Tools
         return $mixed;
     }
 
-    public static function safeJsonEncode($value, $options = 0, $depth = 512): string
+    /**
+     * @param $value
+     * @param $options
+     * @param $depth
+     * @return string
+     * @throws Exception
+     */
+    public static function safeJsonEncode($value, $options = 0, $depth = 512)
     {
         $encoded = json_encode($value, $options, $depth);
         switch (json_last_error()) {
             case JSON_ERROR_NONE:
-                return $encoded ?? '';
+                return $encoded ?: '';
             case JSON_ERROR_DEPTH:
                 throw new Exception('json_encode: Maximum stack depth exceeded');
             case JSON_ERROR_STATE_MISMATCH:
@@ -58,7 +69,11 @@ class Tools
         }
     }
 
-    public static function convertMemoryToByte($limitMemory): int
+    /**
+     * @param string $limitMemory
+     * @return int
+     */
+    public static function convertMemoryToByte($limitMemory)
     {
         if ($limitMemory > 0) {
             if (strpos($limitMemory, 'G')) $m = 1024 * 1024 * 1024;
@@ -70,7 +85,10 @@ class Tools
         return $limitMemory;
     }
 
-    public static function isMemoryOver(): bool
+    /**
+     * @return bool
+     */
+    public static function isMemoryOver()
     {
         $limitMemory = Tools::convertMemoryToByte(ini_get('memory_limit'));
         if ($limitMemory > 0) {
@@ -79,9 +97,20 @@ class Tools
         return false;
     }
 
-    private static array $objects = [];
+    /**
+     * @var array
+     */
+    private static $objects = [];
 
-    public static function dumpAsString(mixed $var, $limitString, int $depth = 3, bool $highlight = false): string
+    /**
+     * @param mixed $var
+     * @param $limitString
+     * @param int $depth
+     * @param bool $highlight
+     * @return string
+     * @throws Exception
+     */
+    public static function dumpAsString($var, $limitString, $depth = 3, $highlight = false)
     {
         $output = Tools::dumpInternal($var, $depth, $limitString);
         if ($highlight) {
@@ -92,7 +121,15 @@ class Tools
         return $output;
     }
 
-    public static function dumpInternal(mixed $var, int $depth, int $limitString = 1024, int $level = 0): string
+    /**
+     * @param mixed $var
+     * @param int $depth
+     * @param int $limitString
+     * @param int $level
+     * @return string
+     * @throws Exception
+     */
+    public static function dumpInternal($var, $depth, $limitString = 1024, $level = 0)
     {
         $output = '';
         switch (gettype($var)) {
@@ -168,7 +205,13 @@ class Tools
         return $output;
     }
 
-    public static function renderDebugArray(mixed $arr, $arrLen = 6, $strLen = 256): mixed
+    /**
+     * @param mixed $arr
+     * @param $arrLen
+     * @param $strLen
+     * @return mixed
+     */
+    public static function renderDebugArray($arr, $arrLen = 6, $strLen = 256)
     {
         if (!is_array($arr)) {
             return $arr;
@@ -211,7 +254,12 @@ class Tools
         return $args;
     }
 
-    public static function containExclude(string $str, array $exclude): bool
+    /**
+     * @param string $str
+     * @param array $exclude
+     * @return bool
+     */
+    public static function containExclude($str, array $exclude)
     {
         foreach ($exclude as $item) {
             if (str_contains($str, $item)) {
@@ -221,13 +269,23 @@ class Tools
         return false;
     }
 
-    public static function isTraceHasExclude(array $traceItem, array $exclude): bool
+    /**
+     * @param array $traceItem
+     * @param array $exclude
+     * @return bool
+     */
+    public static function isTraceHasExclude(array $traceItem, array $exclude)
     {
         $exclude[] = 'phperrorcatcher';
-        return self::containExclude($traceItem['file'] ?? $traceItem['class'], $exclude);
+        return self::containExclude($traceItem['file'] ?: $traceItem['class'], $exclude);
     }
 
-    public static function getFileLineByTrace(array $trace, array $lineExclude = []): string
+    /**
+     * @param array $trace
+     * @param array $lineExclude
+     * @return string
+     */
+    public static function getFileLineByTrace(array $trace, array $lineExclude = [])
     {
         foreach ($trace as $item) {
             if (Tools::isTraceHasExclude($item, $lineExclude)) {
@@ -242,7 +300,11 @@ class Tools
         return '';
     }
 
-    public static function prepareTag(string $tag): string
+    /**
+     * @param string $tag
+     * @return string
+     */
+    public static function prepareTag($tag)
     {
         $tag = (string)$tag;
         if (mb_strlen($tag) > 32) {
@@ -251,7 +313,11 @@ class Tools
         return mb_strtolower($tag);
     }
 
-    public static function prepareTags(array &$tags): array
+    /**
+     * @param array $tags
+     * @return array
+     */
+    public static function prepareTags(array &$tags)
     {
         array_walk($tags, function (&$v) {
             $v = self::prepareTag($v);
@@ -259,8 +325,12 @@ class Tools
         return $tags;
     }
 
-
-    public static function prepareFields(array &$fields, array $excludeKeys): array
+    /**
+     * @param array $fields
+     * @param array $excludeKeys
+     * @return array
+     */
+    public static function prepareFields(array &$fields, array $excludeKeys)
     {
         foreach ($excludeKeys as $key) {
             if (isset($fields[$key])) {
@@ -276,7 +346,12 @@ class Tools
         return $fields;
     }
 
-    public static function prepareMessage(&$message, int $limitString): string
+    /**
+     * @param $message
+     * @param int $limitString
+     * @return string
+     */
+    public static function prepareMessage(&$message, $limitString)
     {
         if (!is_string($message)) {
             $message = Tools::dumpAsString($message, $limitString);
@@ -291,7 +366,7 @@ class Tools
      * @return string
      * @throws Exception
      */
-    public static function esc(mixed $value): string
+    public static function esc($value)
     {
         if (!is_string($value)) {
             $value = self::safeJsonEncode($value, JSON_UNESCAPED_UNICODE);
@@ -301,9 +376,11 @@ class Tools
 
 
     /**
-     * Рекурсивно удаляем директорию
+     * recurse del dir
+     * @param string $dir
+     * @return bool
      */
-    public static function delTree(string $dir): bool
+    public static function delTree($dir)
     {
         $files = array_diff(scandir($dir), [
             '.',

@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\dto;
 
@@ -8,18 +7,32 @@ use Xakki\PhpErrorCatcher\Tools;
 
 class LogData extends AbstractData implements Stringable
 {
-    public string $logKey;
-    public string $message;
-    public string $level;
-    public string $type;
-    public ?string $trace = null;
-    public string $file;
-    public array $tags = [];
-    public array $fields = [];
-    public float $timestamp;
-    public int $count = 1;
+    /** @var string */
+    public $logKey;
+    /** @var string */
+    public $message;
+    /** @var string */
+    public $level;
+    /** @var string */
+    public $type;
+    /** @var string|null */
+    public $trace = null;
+    /** @var string */
+    public $file;
+    /** @var array */
+    public $tags = [];
+    /** @var array */
+    public $fields = [];
+    /** @var float */
+    public $timestamp;
+    /** @var int */
+    public $count = 1;
 
-    public function __toString(): string
+    /**
+     * @return string
+     * @throws \Exception
+     */
+    public function __toString()
     {
         return Tools::safeJsonEncode(get_object_vars($this), JSON_UNESCAPED_UNICODE);
     }
