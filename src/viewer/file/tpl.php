@@ -181,7 +181,7 @@ $tabs = [
     </style>
     <script>
         function bugSp (obj) {
-            var obj = obj.parentNode
+            obj = obj.parentNode
             if (obj.className.indexOf('unfolded') >= 0) obj.className = obj.className.replace('unfolded', '') else obj.className = obj.className + ' unfolded'
         }
     </script>

@@ -45,8 +45,8 @@ class JsLogPlugin extends BasePlugin
             'js',
             $this->catcherLogName,
         ];
-        if (!empty($_POST['s'])) $vars['errStack'] = str_replace('||', PHP_EOL, $_POST['s']);
-        if (!empty($_POST['l'])) $vars['line'] = $_POST['l'];
+        if (!empty($_POST['s'])) $vars[PHPErrorCatcher::FIELD_TRICE] = str_replace('||', PHP_EOL, $_POST['s']);
+        if (!empty($_POST['l'])) $vars[PHPErrorCatcher::FIELD_FILE] = $_POST['l'];
 
         $owner->log($this->level, $mess, $vars);
 

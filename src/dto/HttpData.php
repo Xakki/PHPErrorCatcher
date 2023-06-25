@@ -20,6 +20,8 @@ class HttpData extends AbstractData
     public $userAgent;
     /** @var bool */
     public $overMemory = false;
+    /** @var string */
+    public $shell = '';
 
     /**
      * @return array

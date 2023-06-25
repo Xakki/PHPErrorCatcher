@@ -970,9 +970,6 @@ class PhpErrorCatcher implements LoggerInterface
      */
     public function debug($message, array $context = [])
     {
-        if (!static::$debugMode) {
-            return;
-        }
         $this->log(self::LEVEL_DEBUG, $message, $context);
     }
 
@@ -984,6 +981,9 @@ class PhpErrorCatcher implements LoggerInterface
      */
     public function log($level, $message, array $context = [])
     {
+        if (!static::$debugMode && $level === self::LEVEL_DEBUG) {
+            return;
+        }
         if ($this->count >= 100) {
             if ($this->count == 100) {
                 echo '<p>To many Logs</p>';
