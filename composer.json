@@ -24,7 +24,7 @@
     "psr/log": "^3.0"
   },
   "require-dev": {
-    "phpstan/phpstan": "^1.4",
+    "phpstan/phpstan": "^1.9",
     "squizlabs/php_codesniffer": "^3.7",
     "opsway/psr12-strict-coding-standard": "^1.0"
   },

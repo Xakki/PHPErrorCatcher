@@ -17,10 +17,10 @@ composer-up:
 	$(composer) update $(name)
 
 cs-fix:
-	$(composer) cs-commit-fix
+	$(composer) cs-fix
 
 cs-check:
-	$(composer) cs-commit-check
+	$(composer) cs-check
 
 test:
 	$(composer) phpunit
