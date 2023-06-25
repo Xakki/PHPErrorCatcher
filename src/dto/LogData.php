@@ -2,10 +2,9 @@
 
 namespace Xakki\PhpErrorCatcher\dto;
 
-use Stringable;
 use Xakki\PhpErrorCatcher\Tools;
 
-class LogData extends AbstractData implements Stringable
+class LogData extends AbstractData
 {
     /** @var string */
     public $logKey;

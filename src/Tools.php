@@ -76,10 +76,15 @@ class Tools
     public static function convertMemoryToByte($limitMemory)
     {
         if ($limitMemory > 0) {
-            if (strpos($limitMemory, 'G')) $m = 1024 * 1024 * 1024;
-            elseif (strpos($limitMemory, 'M')) $m = 1024 * 1024;
-            elseif (strpos($limitMemory, 'K')) $m = 1024;
-            else $m = 1;
+            if (strpos($limitMemory, 'G')) {
+                $m = 1024 * 1024 * 1024;
+            } elseif (strpos($limitMemory, 'M')) {
+                $m = 1024 * 1024;
+            } elseif (strpos($limitMemory, 'K')) {
+                $m = 1024;
+            } else {
+                $m = 1;
+            }
             $limitMemory = (int)$limitMemory * $m;
         }
         return $limitMemory;

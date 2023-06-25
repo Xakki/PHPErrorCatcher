@@ -6,10 +6,10 @@ use DateTime;
 use Exception;
 use Generator;
 use Psr\Log\LoggerInterface;
-use Stringable;
 use Xakki\PhpErrorCatcher\contract\CacheInterface;
 use Xakki\PhpErrorCatcher\dto\LogData;
 use Xakki\PhpErrorCatcher\viewer\FileViewer;
+
 use const STDERR;
 use const STDOUT;
 
@@ -112,7 +112,7 @@ class PhpErrorCatcher implements LoggerInterface
         ['level' => self::LEVEL_ERROR],
     ];
 
-    /** @var CacheInterface  */
+    /** @var ?CacheInterface  */
     protected $cache = null;
     protected $cacheLifeTime = 600;
 
@@ -188,7 +188,7 @@ class PhpErrorCatcher implements LoggerInterface
             static::$dirRoot = $_SERVER['DOCUMENT_ROOT'];
         }
         if (ini_get('max_execution_time')) {
-            $this->cacheLifeTime = ini_get('max_execution_time') * 2;
+            $this->cacheLifeTime = (int) ini_get('max_execution_time') * 2;
         }
 
         try {
@@ -641,11 +641,13 @@ class PhpErrorCatcher implements LoggerInterface
             return;
         }
         if (empty($_SERVER['argv'])) {
-            if ($this->checkRules($logData, static::$printHttpRules))
+            if ($this->checkRules($logData, static::$printHttpRules)) {
                 $this->printHttp($logData);
+            }
         } else {
-            if ($this->checkRules($logData, static::$printConsoleRules))
+            if ($this->checkRules($logData, static::$printConsoleRules)) {
                 $this->printConsole($logData);
+            }
         }
     }
 
@@ -660,7 +662,13 @@ class PhpErrorCatcher implements LoggerInterface
      */
     protected function printConsole(LogData $logData)
     {
-        $output = PHP_EOL . rtrim(DateTime::createFromFormat('U.u', $logData->timestamp)->format('H:i:s.u'), '0')
+        $dt = DateTime::createFromFormat('U.u', (string) $logData->timestamp);
+        if ($dt) {
+            $dt = rtrim($dt->format('H:i:s.u'), '0');
+        } else {
+            $dt = '';
+        }
+        $output = PHP_EOL . $dt
             . ' ' . Tools::cliColor($logData->level, self::CLI_LEVEL_COLOR[$logData->level]);
         if ($logData->tags) {
             $output .= Tools::cliColor(' [' . implode(', ', $logData->tags) . ']', Tools::COLOR_GRAY);
@@ -860,7 +868,11 @@ class PhpErrorCatcher implements LoggerInterface
         return LogData::init($raw);
     }
 
-    protected function collectTagsAndFields(array $context): array
+    /**
+     * @param array $context
+     * @return array
+     */
+    protected function collectTagsAndFields(array $context)
     {
         $tags = $fields = [];
         foreach ($context as $k => $v) {
@@ -892,7 +904,7 @@ class PhpErrorCatcher implements LoggerInterface
     /***************************************************/
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -903,7 +915,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -914,7 +926,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -924,7 +936,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -934,7 +946,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -944,7 +956,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -954,7 +966,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param Stringable|string $message
+     * @param string $message
      * @param array $context
      * @return void
      */
@@ -993,9 +1005,10 @@ class PhpErrorCatcher implements LoggerInterface
 
         $logData = $this->createLogData($level, $message, $context);
 
-        if ($this->checkRules($logData, static::$ignoreRules)) return;
+        if ($this->checkRules($logData, static::$ignoreRules)) {
+            return;
+        }
 
         $this->add($logData);
     }
-
 }

@@ -69,7 +69,7 @@ class FileViewer extends BaseViewer
     ];
 
     /**
-     * @var FileStorage|\Xakki\PhpErrorCatcher\storage\BaseStorage
+     * @var FileStorage&\Xakki\PhpErrorCatcher\storage\BaseStorage
      */
     protected $fileStorage;
 
@@ -471,7 +471,7 @@ class FileViewer extends BaseViewer
      * Render line
      *
      * @param HttpData $httpData
-     * @param LogData[]|Generator $logs
+     * @param LogData[]&Generator $logs
      * @return void
      */
     public static function renderAllLogs(HttpData $httpData, Generator $logs)
@@ -484,15 +484,15 @@ class FileViewer extends BaseViewer
         echo '<div class="bugs">';
         if (!empty($httpData->shell)) {
             echo '<span class="bugs_uri">console / ' . $httpData->shell . '</span> ';
-        }
-        else {
+        } else {
             if (!empty($httpData->method)) {
                 echo '<span class="bugs_uri">' . $httpData->method . '</span> ';
             }
-            if (!empty($httpData->url))
+            if (!empty($httpData->url)) {
                 echo '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
-            elseif (!empty($httpData->host))
+            } elseif (!empty($httpData->host)) {
                 echo '<div class="bugs_uri">' . $httpData->host . '</div> ';
+            }
         }
 
         if (!empty($httpData->ipAddr)) {
@@ -551,5 +551,4 @@ class FileViewer extends BaseViewer
 
         echo '</div>';
     }
-
 }

@@ -119,8 +119,9 @@ class FileStorage extends BaseStorage
         } else {
             $data->host = isset($serverData['HTTP_X_SERVER_NAME']) ? $serverData['HTTP_X_SERVER_NAME'] : (isset($serverData['SERVER_NAME']) ? $serverData['SERVER_NAME'] : '');
         }
-        if (!empty($_SERVER['SHELL']))
+        if (!empty($_SERVER['SHELL'])) {
             $data->shell = implode(' ', $_SERVER['argv']);
+        }
 
         if (!empty($serverData['REQUEST_METHOD'])) {
             $data->method = $serverData['REQUEST_METHOD'];

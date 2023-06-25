@@ -1,20 +1,20 @@
 SHELL = /bin/bash
 ### https://makefiletutorial.com/
 
-docker := docker run -it -v $(PWD):/app phperrorcatcher
+docker := docker run -it -v $(PWD):/app phperrorcatcher56
 composer := $(docker) composer
 
 docker-build:
-	docker build -t phperrorcatcher .
+	docker build -t phperrorcatcher56 .
 
 bash:
-	$(docker) bash
+	$(docker) sh
 
 composer-install:
 	$(composer) install
 
 composer-up:
-	$(composer) update $(name)
+	$(composer) update $(name) --no-plugins
 
 cs-fix:
 	$(composer) cs-fix
@@ -24,9 +24,6 @@ cs-check:
 
 test:
 	$(composer) phpunit
-
-phpstan:
-	$(docker) composer phpstan
 
 psalm:
 	$(docker) vendor/bin/psalm

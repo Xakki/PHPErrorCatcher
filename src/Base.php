@@ -9,17 +9,20 @@ abstract class Base
      */
     protected $owner;
 
+    /**
+     * @param PhpErrorCatcher $owner
+     * @param array $config
+     */
     public function __construct(PhpErrorCatcher $owner, $config = [])
     {
         $this->owner = $owner;
         $this->applyConfig($config);
     }
 
-//    function __destruct()
-//    {
-//
-//    }
-
+    /**
+     * @param array $config
+     * @return void
+     */
     public function applyConfig(array $config)
     {
         foreach ($config as $key => $value) {
@@ -29,6 +32,11 @@ abstract class Base
         }
     }
 
+    /**
+     * @param string $method
+     * @param ?array $arguments
+     * @return null
+     */
     public function __call($method, $arguments = null)
     {
         $action = substr($method, 0, 3);

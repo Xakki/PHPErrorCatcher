@@ -24,5 +24,4 @@ abstract class BaseViewer extends Base
         $url = parse_url($url);
         return $url['path'] . '?' . $this->getInitGetKey() . '=' . $end;
     }
-
 }
