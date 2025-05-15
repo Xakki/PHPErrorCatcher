@@ -19,6 +19,11 @@ abstract class Base
         $this->applyConfig($config);
     }
 
+    function __destruct()
+    {
+
+    }
+
     /**
      * @param array $config
      * @return void

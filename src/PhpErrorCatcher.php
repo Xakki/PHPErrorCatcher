@@ -2,20 +2,15 @@
 
 namespace Xakki\PhpErrorCatcher;
 
-use DateTime;
-use Exception;
-use Generator;
-use Psr\Log\LoggerInterface;
-use Xakki\PhpErrorCatcher\contract\CacheInterface;
-use Xakki\PhpErrorCatcher\dto\LogData;
-use Xakki\PhpErrorCatcher\viewer\FileViewer;
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+if(!defined('STDIN'))  define('STDIN',  fopen('php://stdin',  'rb'));
+if(!defined('STDOUT')) define('STDOUT', fopen('php://stdout', 'wb'));
+if(!defined('STDERR')) define('STDERR', fopen('php://stderr', 'wb'));
 
-use const STDERR;
-use const STDOUT;
-
-class PhpErrorCatcher implements LoggerInterface
+class PhpErrorCatcher implements \Psr\Log\LoggerInterface
 {
-    const VERSION = '0.8.1';
+    const VERSION = '0.6.0';
 
     const LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
@@ -23,7 +18,8 @@ class PhpErrorCatcher implements LoggerInterface
         LEVEL_NOTICE = 'notice',
         LEVEL_WARNING = 'warning',
         LEVEL_ERROR = 'error',
-        LEVEL_CRITICAL = 'critical';
+        LEVEL_CRITICAL = 'critical',
+        LEVEL_ALERT = 'alert';
 
     const TYPE_LOGGER = 'logger',
         TYPE_TRIGGER = 'trigger',
@@ -34,16 +30,7 @@ class PhpErrorCatcher implements LoggerInterface
         FIELD_FILE = 'file',
         FIELD_TRICE = 'trice',
         FIELD_NO_TRICE = 'trice_no_fake',
-        FIELD_ERR_CODE = 'error_code',
-        FIELD_EXC_CODE = 'exception_code';
-
-    const LOG_FIELDS = [
-        self::FIELD_LOG_TYPE,
-        self::FIELD_FILE,
-        self::FIELD_TRICE,
-        self::FIELD_NO_TRICE,
-        self::FIELD_ERR_CODE,
-    ];
+        FIELD_ERR_CODE = 'error_code';
 
     protected static $triggerLevel = [
         E_ERROR => self::LEVEL_ERROR,
@@ -62,216 +49,215 @@ class PhpErrorCatcher implements LoggerInterface
         E_STRICT => self::LEVEL_ERROR,
         E_RECOVERABLE_ERROR => self::LEVEL_ERROR,
     ];
-
-    const CLI_LEVEL_COLOR = [
-        self::LEVEL_CRITICAL => Tools::COLOR_RED,
-        self::LEVEL_ERROR => Tools::COLOR_RED,
-        self::LEVEL_WARNING => Tools::COLOR_YELLOW,
-        self::LEVEL_NOTICE => Tools::COLOR_BLUE,
-        self::LEVEL_INFO => Tools::COLOR_GREEN,
-        self::LEVEL_TIME => Tools::COLOR_LIGHT_BLUE,
-        self::LEVEL_DEBUG => Tools::COLOR_BLUE2,
+    protected static $logLevel = [
+        LOG_EMERG => self::LEVEL_ALERT,
+        LOG_ALERT=> self::LEVEL_ALERT,
+        LOG_CRIT=> self::LEVEL_CRITICAL,
+        LOG_ERR=> self::LEVEL_ERROR,
+        LOG_WARNING=> self::LEVEL_WARNING,
+        LOG_NOTICE=> self::LEVEL_NOTICE,
+        LOG_INFO=> self::LEVEL_INFO,
+        LOG_DEBUG=> self::LEVEL_DEBUG,
     ];
+
 
     /************************************/
     // Config
     /************************************/
 
-    protected static $dirRoot = '';
-    public static $debugMode = false;//ERROR_DEBUG_MODE
-    public static $traceShowArgs = true;
+    public $debugMode = false;//ERROR_DEBUG_MODE
+    public $enableSessionLog = false;
+    public $globalTag = '';
+    public $isFullTrace = false;
 
     protected $logTimeProfiler = false;// time execute log
-    protected static $logCookieKey = '';
-    protected static $limitTrace = 10;
-    protected static $maxLenMessage = 5000;
+    protected $logCookieKey = '';
+    protected $dirRoot = '';
+    protected $limitTrace = 10;
+    protected $limitString = 1024;
+    protected $enableCookieLog = false;
+    protected $enablePostLog = true;
+    /**
+     * Callback Error
+     * @var null|callable
+     */
+    protected $errorCallback = null;
 
-    protected static $logTags = [];
-    protected static $logFields = [];
+    /**
+     * Параметры(POST,SESSION,COOKIE) затираемы при записи в логи
+     * @var array
+     */
+    protected $safeParamsKey = [
+        'password',
+        'input_password',
+        'pass',
+    ];
 
     protected $logTraceByLevel = [
         self::LEVEL_CRITICAL => 10, // trace deep level
-        self::LEVEL_ERROR => 8,
-        self::LEVEL_WARNING => 16,
+        self::LEVEL_ERROR => 7,
+        self::LEVEL_WARNING => 5,
     ];
 
-    protected static $ignoreRules = [
-        //['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
+    protected $saveLogIfHasError = [
+        self::LEVEL_WARNING, self::LEVEL_ERROR, self::LEVEL_CRITICAL, self::LEVEL_ALERT
     ];
-
-    protected static $stopRules = [
-        //['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
+    protected $ignoreRules = [
+        //        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
     ];
-
-    protected static $printHttpRules = [
-        ['level' => self::LEVEL_CRITICAL],
+    protected $stopRules = [
+        //        ['level' => self::LEVEL_NOTICE, 'type' => self::TYPE_TRIGGER]
     ];
-
-    protected static $printConsoleRules = [
-        ['level' => self::LEVEL_CRITICAL],
-        ['level' => self::LEVEL_ERROR],
+    /**
+     * @var array|\Memcached
+     */
+    protected $cacheServers = [
+        ['localhost', 11211],
     ];
+    protected $memcacheId = 'phperr';
 
-    /** @var ?CacheInterface  */
-    protected $cache = null;
-    protected $cacheLifeTime = 600;
+    protected $lifeTime = 600;//sec // ini_get('max_execution_time')
 
+    protected $logTags = [];
+    protected $logFields = [];
     /************************************/
     // Variable
     /************************************/
 
-    protected $count = 0;
-    protected $errCount = 0;
-    protected $timeStart = 0;
-    protected $timeEnd = 0;
-    protected $saveLogIfHasError = false;
-    protected $sessionKey = '';
-
-    /**
-     * @var plugin\BasePlugin[]
-     */
-    protected static $plugins = [];
-    /**
-     * @var storage\BaseStorage[]
-     */
-    protected static $storages = [];
-
-    /**
-     * @var viewer\BaseViewer|null
-     */
-    protected static $viewer = null;
-
-    /**
-     * @var LogData[]
-     */
-    protected $logData = [];
-
+    protected $_count = 0;
     /**
      * @var int[]
      */
-    protected $logCached = [];
+    protected $countByLevel = [];
+    protected $_time_start = null;
+    protected $_time_end = null;
 
-    protected $successSaveLog = false;
-    protected static $userCatchLogKeys = [];
-    protected static $userCatchLogFlag = false;
+    protected $_isViewMode = false;
+    protected $_sessionKey = null;
+    protected $_hasError = false;
+    protected $_postData = null, $_cookieData = null, $_sessionData = null;
+    /**
+     * @var plugin\BasePlugin[]
+     */
+    protected $_plugins = [];
 
-    protected static $errorLevel = [
+    /**
+     * @var storage\BaseStorage[]
+     */
+    protected $_storages = [];
+
+    /**
+     * @var null|viewer\BaseViewer
+     */
+    protected $_viewer = null;
+
+    protected $_successSaveLog = false;
+
+    /**
+     * @var \Memcached|null
+     */
+    protected static $_MEMCACHE = null;
+    protected static $_viewAlert = [];
+    protected static $_functionTimeOut = null;
+    protected static $_functionStartTime;
+    protected static $_userCatchLogKeys = [];
+    protected static $_userCatchLogFlag = false;
+
+    protected static $_errorLevel = [
         self::LEVEL_CRITICAL => 1,
         self::LEVEL_ERROR => 1,
         self::LEVEL_WARNING => 1,
     ];
 
+    /*******************************/
+
     /**
-     * @var $this
+     * singleton object
+     * @var static
      */
-    protected static $obj;
+    protected static $_obj;
 
     /**
      * Initialization
      * @param array $config
-     * @return static
-     * @throws Exception
+     * @return PhpErrorCatcher
      */
-    public static function init(array $config = [])
+    public static function init($config = [])
     {
-        if (empty(static::$obj)) {
-            static::$obj = new static($config);
+        if (!static::$_obj) {
+            new self($config);
         }
-        return static::$obj;
+        return static::$_obj;
     }
 
-    protected function __construct($config = [])
+    protected $_configOrigin = [];
+
+    public function __construct($config = [])
     {
-        $this->timeStart = microtime(true);
-
-        if (!static::$dirRoot) {
-            static::$dirRoot = $_SERVER['DOCUMENT_ROOT'];
-        }
-        if (ini_get('max_execution_time')) {
-            $this->cacheLifeTime = (int) ini_get('max_execution_time') * 2;
-        }
-
+        static::$_obj = $this;
         try {
-            if (empty($config['storage'])) {
-                throw new Exception('Storages config is require');
-            }
-
-            $storage = $config['storage'];
-            unset($config['storage']);
-
-            $viewer = null;
-            if (!empty($config['viewer'])) {
-                $viewer = $config['viewer'];
-                unset($config['viewer']);
-            }
-
-            $plugin = null;
-            if (!empty($config['plugin'])) {
-                $plugin = $config['plugin'];
-                unset($config['plugin']);
-            }
+            $this->_configOrigin = $config;
+            if (empty($config['storage'])) throw new \Exception('Storages config is require');
 
             $this->applyConfig($config);
+            $this->_time_start = microtime(true);
+            if (!$this->dirRoot) $this->dirRoot = $_SERVER['DOCUMENT_ROOT'];
+            if (ini_get('max_execution_time'))
+                $this->lifeTime = ini_get('max_execution_time') * 2;
 
-            $this->initStorage($storage);
-
-            if ($plugin) {
-                $this->initPlugins($plugin);
-            }
-
-            if ($viewer) {
-                $this->initViewer($viewer);
-            }
+            $this->initStorage($config['storage']);
 
             register_shutdown_function([
                 $this,
                 'handleShutdown',
             ]);
-
             set_error_handler([
                 $this,
                 'handleTrigger',
             ], E_ALL);
-
             set_exception_handler([
                 $this,
                 'handleException',
             ]);
 
-        } catch (Exception $e) {
-            if (static::$debugMode) {
+            if (!empty($config['plugin']))
+                $this->initPlugins($config['plugin']);
+
+            if (!empty($config['viewer'])) {
+                $this->initViewer($config['viewer']);
+            }
+
+        } catch (\Exception $e) {
+            if ($this->debugMode) {
                 echo 'Cant init logger: ' . $e->__toString();
                 exit('ERR');
-            } else {
-                throw $e;
             }
         }
-    }
 
-    private function __clone()
-    {
-    }
-
-    final public function __serialize()
-    {
-    }
-
-    final public function __wakeup()
-    {
     }
 
     public function __destruct()
     {
-        static::$plugins = [];
-        static::$storages = [];
+        $this->_plugins = [];
+        $this->_storages = [];
     }
 
     protected function applyConfig($config)
     {
         foreach ($config as $key => $value) {
-            if (property_exists($this, $key)) {
-                static::${$key} = $value;
+            if (property_exists($this, $key) && substr($key, 0, 1) != '_') {
+                $this->$key = $value;
             }
+        }
+    }
+
+    /**
+     * @deprecated
+     */
+    public static function setConfig($key, $value)
+    {
+        if (property_exists(static::$_obj, $key) && substr($key, 0, 1) != '_') {
+            static::$_obj->{$key} = $value;
         }
     }
 
@@ -286,121 +272,142 @@ class PhpErrorCatcher implements LoggerInterface
         return null;
     }
 
-    /**
-     * @return viewer\BaseViewer|null
-     */
     public function getViewer()
     {
-        return static::$viewer;
+        return $this->_viewer;
     }
 
     /**
-     * @param string $class
+     * @param $class
      * @return storage\BaseStorage|null
      */
     public function getStorage($class)
     {
-        return static::$storages[$class] ? : null;
+        return (isset($this->_storages[$class]) ? $this->_storages[$class] : null);
     }
 
-    /**
-     * @return storage\BaseStorage[]
-     */
     public function getStorages()
     {
-        return static::$storages;
+        return $this->_storages;
+    }
+
+//    /**
+//     * @return \Generator|LogData[]
+//     * @throws \Exception
+//     */
+//    public function getDataLogsGenerator()
+//    {
+//        foreach ($this->_logData as $key => $logData) {
+//            if (self::$_userCatchLogFlag && isset(self::$_userCatchLogKeys[$key])) {
+//                continue;
+//            }
+//            if (!is_object($logData)) {
+//                $logData = $this->getLogDataFromMemcache($key);
+//                if (!$logData) {
+//                    // cache expired
+//                    continue;
+//                }
+//            }
+//            yield $logData;
+//        }
+//    }
+
+    /**
+     * @param string $tag
+     * @return void
+     */
+    public function setGlobalTag($tag)
+    {
+        $this->globalTag = $tag;
     }
 
     /**
-     * @return Generator|LogData[]
-     * @throws Exception
+     * @return string
      */
-    public function getDataLogsGenerator()
+    public function getGlobalTag()
     {
-        $data = count($this->logData) ? $this->logData : $this->logCached;
-        foreach ($data as $key => $logData) {
-            if (self::$userCatchLogFlag && !isset(self::$userCatchLogKeys[$key])) {
-                // skip user catch logs
-                continue;
-            }
-            if (!is_object($logData)) {
-                $logData = $this->getLogDataFromCache($key);
-                if (!$logData) {
-                    // cache expired
-                    continue;
+        return $this->globalTag;
+    }
+
+    /**
+     * @return \Memcached|null
+     */
+    public function memcache($restore = false)
+    {
+        static $mem;
+        if (is_null($mem)) {
+            $mem = false;
+            if ($this->cacheServers instanceof \Memcached) {
+                $mem = $this->cacheServers;
+            } elseif (extension_loaded('memcached')) {
+                $mem = new \Memcached ($this->memcacheId);
+                $mem->setOption(\Memcached::OPT_PREFIX_KEY, 'logger');
+                //$mem->setOption(\Memcached::OPT_LIBKETAMA_COMPATIBLE, true);
+                $mem->setOption(\Memcached::OPT_NO_BLOCK, true);
+                $mem->setOption(\Memcached::OPT_CONNECT_TIMEOUT, 4);
+
+                foreach ($this->cacheServers as $serverStr) {
+                    $server = explode(':', $serverStr);
+                    if (!$mem->addServer($server[0], (int) $server[1])) {
+                        trigger_error('Cant connect to memcached: ' . $serverStr, E_USER_WARNING);
+                        return static::$_MEMCACHE;
+                    }
                 }
             }
-            yield $logData;
         }
-    }
-
-    public function successSaveLog()
-    {
-        $this->successSaveLog = true;
+        return $mem;
     }
 
     /**
-     * @return CacheInterface|null
-     */
-    public function cache()
-    {
-        return $this->cache;
-    }
-
-    /**
-     * @return void
+     * When script stop
      */
     public function handleShutdown()
     {
-        $this->timeEnd = (int)((microtime(true) - $this->timeStart) * 1000);
+        $this->_time_end = (microtime(true) - $this->_time_start) * 1000;
 
         $error = error_get_last();
         if ($error) {
-            $context = [
+            $fields = [
                 self::FIELD_FILE => $this->getRelativeFilePath($error['file']) . ':' . $error['line'],
                 self::FIELD_LOG_TYPE => self::TYPE_FATAL,
                 self::FIELD_ERR_CODE => $error['type'],
-                'unhandle',
             ];
-            $this->log(self::$triggerLevel[$error['type']], $error['message'], $context);
+            $this->log(self::$triggerLevel[$error['type']], $error['message'], ['unhandle'], $fields);
         }
 
         if ($this->logTimeProfiler) {
-            $this->log(self::LEVEL_TIME, $this->timeEnd, ['execution']);
+            $this->log(self::LEVEL_TIME, $this->_time_end, ['execution'], []);
         }
 
-        if (self::$userCatchLogFlag) {
-            $this->log(self::LEVEL_WARNING, 'Miss flush userCatchLog');
-            self::$userCatchLogFlag = false;
+        if (self::$_userCatchLogFlag) {
+            $this->log(self::LEVEL_WARNING, 'Miss flush userCatchLog', [], []);
+            self::$_userCatchLogFlag = false;
         }
     }
 
-    /**
-     * @return bool
-     */
     public function needSaveLog()
     {
-        return !$this->successSaveLog && $this->hasLog() && (!$this->saveLogIfHasError || $this->errCount);
+        if ($this->debugMode) return true;
+        return $this->getCountByLevelAndLess($this->saveLogIfHasError);
     }
 
     /**
-     * @param Exception $e
-     * @return void
+     * Обработчик исключений
+     * @param $e \Exception
      */
     public function handleException($e)
     {
-        $context = [self::FIELD_LOG_TYPE => self::TYPE_EXCEPTION, 'unhandle'];
-        $this->log(self::LEVEL_CRITICAL, $e, $context);
+        $fields = [self::FIELD_LOG_TYPE => self::TYPE_EXCEPTION];
+        $this->log(self::LEVEL_CRITICAL, $e, ['unhandle'], $fields);
     }
 
     /**
-     * trigger_error catch
-     * @param int $errno
-     * @param string $errstr
-     * @param string $errfile
-     * @param int $errline
-     * @param array|null $vars
-     * @return bool
+     * Обработчик триггерных ошибок
+     * @param $errno
+     * @param $errstr
+     * @param $errfile
+     * @param $errline
+     * @param null $vars
      */
     public function handleTrigger($errno, $errstr, $errfile, $errline, $vars = null)
     {
@@ -413,91 +420,97 @@ class PhpErrorCatcher implements LoggerInterface
             self::FIELD_FILE => $this->getRelativeFilePath($errfile) . ':' . $errline,
             self::FIELD_LOG_TYPE => self::TYPE_TRIGGER,
             self::FIELD_ERR_CODE => $errno,
+            self::FIELD_TRICE => array_slice(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $this->limitTrace + 1), 1),
         ];
 
-        $this->log(self::$triggerLevel[$errno], $errstr, $fields);
+        $this->log(self::$triggerLevel[$errno], $errstr, [], $fields);
 
-        if (function_exists('error_clear_last')) {
-            error_clear_last();
-        }
+        if (function_exists('error_clear_last'))
+            \error_clear_last();
 
         return true; /* Не запускаем внутренний обработчик ошибок PHP */
     }
 
     /****************************************************/
 
-    protected function initStorage(array $configs)
+    protected function initStorage($configs)
     {
         foreach ($configs as $storage => $config) {
             $keyStorage = $storage;
-
             if (class_exists(__NAMESPACE__ . '\\storage\\' . $storage)) {
                 $storage = __NAMESPACE__ . '\\storage\\' . $storage;
             } elseif (!class_exists($storage)) {
-                throw new Exception('Storage `' . $storage . '` cant find ');
+                throw new \Exception('Storage `' . $storage . '` cant find ');
             }
             if (!is_subclass_of($storage, __NAMESPACE__ . '\\storage\\BaseStorage')) {
-                throw new Exception('Storage `' . $storage . '` must be implement from storage\BaseStorage');
+                throw new \Exception('Storage `' . $storage . '` must be implement from storage\BaseStorage');
             }
-
-            static::$storages[$keyStorage] = new $storage($this, $config);
+            $this->_storages[$keyStorage] = new $storage($this, $config);
         }
-        if (!static::$storages) {
-            throw new Exception('Storages config is require');
+        if (!$this->_storages) {
+            throw new \Exception('Storages config is require');
         }
     }
 
-    protected function initPlugins(array $configs)
+    protected function initPlugins($configs)
     {
         foreach ($configs as $plugin => $config) {
-            if (!empty($config['initGetKey']) && !isset($_GET[$config['initGetKey']])) {
+            if (!empty($config['initGetKey']) && !isset($_GET[$config['initGetKey']]))
                 continue;
-            }
-            $keyStorage = $plugin;
 
             if (class_exists(__NAMESPACE__ . '\\plugin\\' . $plugin)) {
                 $plugin = __NAMESPACE__ . '\\plugin\\' . $plugin;
             } elseif (!class_exists($plugin)) {
-                throw new Exception('Plugins `' . $plugin . '` cant find ');
+                throw new \Exception('Plugins `' . $plugin . '` cant find ');
             }
             if (!is_subclass_of($plugin, __NAMESPACE__ . '\\plugin\\BasePlugin')) {
-                throw new Exception('Plugins `' . $plugin . '` must be implement from plugin\BasePlugin');
+                throw new \Exception('Plugins `' . $plugin . '` must be implement from plugin\BasePlugin');
             }
-
-            static::$plugins[$keyStorage] = new $plugin($this, $config);
+            $this->_plugins[$plugin] = new $plugin($this, $config);
         }
     }
 
-    /**
-     * @param array $config
-     * @return viewer\BaseViewer
-     * @throws Exception
-     */
-    protected function initViewer(array $config)
+    protected function initViewer($config)
     {
+
         if (class_exists(__NAMESPACE__ . '\\viewer\\' . $config['class'])) {
             $viewer = __NAMESPACE__ . '\\viewer\\' . $config['class'];
         } elseif (class_exists($config['class'])) {
             $viewer = $config['class'];
         } else {
-            throw new Exception('Viewer `' . $config['class'] . '` cant find ');
+            throw new \Exception('Viewer `' . $config['class'] . '` cant find ');
         }
         if (!is_subclass_of($viewer, __NAMESPACE__ . '\\viewer\\BaseViewer')) {
-            throw new Exception('Viewr `' . $viewer . '` must be implement from plugin\BasePlugin');
+            throw new \Exception('Viewr `' . $viewer . '` must be implement from plugin\BasePlugin');
+        }
+        $this->_viewer = new $viewer($this, $config);
+
+        if (isset($_GET[$config['initGetKey']])) {
+            $this->_isViewMode = true;
+            ini_set("memory_limit", "128M");
+
+            ob_start();
+            $html = '';
+            try {
+                $html = $this->getViewer()
+                    ->renderView();
+                $html .= ob_get_contents();
+            } catch (\Exception $e) {
+                $html .= $e;
+            }
+
+            ob_end_clean();
+            echo $html;
+            exit();
         }
 
-        static::$viewer = new $viewer($this, $config);
-
-        return static::$viewer;
+        return $this->_viewer;
     }
 
-    /**
-     * @return string
-     */
     protected function getSessionKey()
     {
-        if (!$this->sessionKey) {
-            $this->sessionKey = md5(
+        if (!$this->_sessionKey) {
+            $this->_sessionKey = md5(
                 (!empty($_SERVER['REQUEST_TIME_FLOAT']) ? $_SERVER['REQUEST_TIME_FLOAT'] : '')
                 . (!empty($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '')
                 . (!empty($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'cli')
@@ -506,202 +519,123 @@ class PhpErrorCatcher implements LoggerInterface
                 . (!empty($_SERVER['argv']) ? json_encode($_SERVER['argv']) : '')
             );
         }
-        return $this->sessionKey;
+        return $this->_sessionKey;
     }
 
-    /**
-     * @param LogData $logData
-     * @param array $rules
-     * @return bool
-     */
-    protected function checkRules(LogData $logData, array $rules)
+    protected function ifStopRules(LogData $logData)
     {
-        if (count($rules)) {
-            foreach ($rules as $rule) {
+        if (count($this->stopRules)) {
+            foreach ($this->stopRules as $rule) {
                 $i = count($rule);
-                if (!empty($rule['level']) && $rule['level'] == $logData->level) {
-                    $i--;
-                }
-                if (!empty($rule['type']) && $rule['type'] == $logData->type) {
-                    $i--;
-                }
-                if (!empty($rule['message']) && $rule['message'] == $logData->message) {
-                    $i--;
-                }
-                if ($i == 0) {
-                    return true;
-                }
+                if (!empty($rule['level']) && $rule['level'] == $logData->level) $i--;
+                if (!empty($rule['type']) && $rule['type'] == $logData->type) $i--;
+                if (!empty($rule['message']) && $rule['message'] == $logData->message) $i--;
+                if ($i == 0) return true;
             }
         }
         return false;
     }
 
-    /**
-     * @return bool
-     */
-    protected function hasLog()
-    {
-        return count($this->logData) || count($this->logCached);
-    }
-
-    /**
-     * @param $level
-     * @param mixed $message
-     * @param array $context
-     * @return LogData
-     */
-    protected function createLogData($level, $message, array $context = [])
-    {
-        if (isset(self::$errorLevel[$level])) {
-            $this->errCount++;
-        }
-        $this->count++;
-
-        list($tags, $fields) = $this->collectTagsAndFields($context);
-
-        if (is_object($message)) {
-            // если это эксепшн и другие подобные объекты
-            list($message, $fields2) = $this->getLogFromObject($message);
-            if ($fields2) {
-                $fields = array_merge($fields, $fields2);
-            }
-        }
-
-        $logData = new LogData();
-        $logData->message = Tools::prepareMessage($message, self::$maxLenMessage);
-        $logData->level = $level;
-        $logData->type = $fields[self::FIELD_LOG_TYPE];
-
-        if (isset($this->logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE])) {
-            $logData->trace = $this->renderDebugTrace(
-                $fields[self::FIELD_TRICE] ?: null,
-                0,
-                (int)$this->logTraceByLevel[$level]
-            );
-        }
-
-        if (isset($fields[self::FIELD_FILE])) {
-            $logData->file = $fields[self::FIELD_FILE];
-        } else {
-            $logData->file = $this->getFileLineByTrace();
-        }
-
-        $logData->tags = Tools::prepareTags($tags);
-        $logData->fields = Tools::prepareFields($fields, self::LOG_FIELDS);
-        $logData->timestamp = microtime(true);
-        $logData->logKey = 'phpeErCh_' . $this->getSessionKey() . '_' . md5($logData->message . $logData->file);
-        return $logData;
-    }
-
     protected function add(LogData $logData)
     {
-        $result = false;
+        if (!empty($_SERVER['argv'])) {
+            $this->consolePrint($logData);
+        }
+        elseif ($this->debugMode && empty($_SERVER['is_json'])) {
+            $this->htmlPrint($logData);
+        }
+
         $key = $logData->logKey;
-        if ($this->cache()) {
-            if (isset($this->logCached[$key])) {
-                $logData->count += $this->logCached[$key];
-            }
-            try {
-                if ($this->checkRules($logData, static::$stopRules)) {
-                    $this->printLog($logData);
-                    exit();
-                }
 
-                $str = $logData->__toString();
-                if ($str) {
-                    $result = $this->cache()->set($key, $str, $this->cacheLifeTime);
-                }
-            } catch (Exception $e) {
-                $this->printLog($logData);
-                $this->printLog($this->createLogData(self::LEVEL_CRITICAL, $e));
-            }
+        if ($this->ifStopRules($logData)) {
+            // TODO: option & cli print
+//                    echo PHP_EOL;
+//                    print_r($logData);
+//                    echo PHP_EOL;
+            exit('Fatal error happen!');
         }
 
-        if (!$result) {
-            if (isset($this->logData[$key])) {
-                $this->logData[$key]->count++;
-            } else {
-                $this->logData[$key] = $logData;
-            }
+        if (self::$_userCatchLogFlag) {
+            self::$_userCatchLogKeys[$key] = $logData;
         } else {
-            if (isset($this->logCached[$key])) {
-                $this->logCached[$key]++;
-            } else {
-                $this->logCached[$key] = 1;
-            }
-        }
-        if (self::$userCatchLogFlag) {
-            self::$userCatchLogKeys[$key] = true;
-        }
-    }
-
-    protected function printLog(LogData $logData)
-    {
-        if ($logData->level === self::LEVEL_DEBUG && !static::$debugMode) {
-            return;
-        }
-        if (empty($_SERVER['argv'])) {
-            if ($this->checkRules($logData, static::$printHttpRules)) {
-                $this->printHttp($logData);
-            }
-        } else {
-            if ($this->checkRules($logData, static::$printConsoleRules)) {
-                $this->printConsole($logData);
+            foreach($this->_storages as $store) {
+                $store->write($logData);
             }
         }
     }
 
-    protected function printHttp(LogData $logData)
+    const COLOR_GREEN = '0;32',
+        COLOR_GRAY = '0;37',
+        COLOR_GRAY2 = '1;37',
+        COLOR_YELLOW = '1;33',
+        COLOR_RED = '0;31',
+        COLOR_WHITE = '1;37',
+        COLOR_LIGHT_BLUE = '1;34',
+        COLOR_BLUE = '0;34',
+        COLOR_BLUE2 = '1;36';
+
+    const CLI_LEVEL_COLOR = [
+        self::LEVEL_CRITICAL => self::COLOR_RED,
+        self::LEVEL_ERROR => self::COLOR_RED,
+        self::LEVEL_WARNING => self::COLOR_YELLOW,
+        self::LEVEL_NOTICE => self::COLOR_BLUE,
+        self::LEVEL_INFO => self::COLOR_GREEN,
+        self::LEVEL_TIME => self::COLOR_LIGHT_BLUE,
+        self::LEVEL_DEBUG => self::COLOR_BLUE2,
+    ];
+
+    private static function cliColor($text, $colorId)
     {
-        FileViewer::renderItemLog($logData);
+        if (!isset($_SERVER['TERM'])) return $text;
+        return "\033[" . $colorId . "m" . $text . "\033[0m";
     }
 
-    /**
-     * @param LogData $logData
-     * @return void
-     */
-    protected function printConsole(LogData $logData)
+    protected function consolePrint(LogData $logData)
     {
-        $dt = DateTime::createFromFormat('U.u', (string) $logData->timestamp);
+        if ($logData->level === self::LEVEL_DEBUG && !$this->debugMode) return;
+
+        $dt = \DateTime::createFromFormat('U.u', (string) $logData->microtime);
         if ($dt) {
             $dt = rtrim($dt->format('H:i:s.u'), '0');
         } else {
-            $dt = '';
+            $dt = '!!!';
         }
         $output = PHP_EOL . $dt
-            . ' ' . Tools::cliColor($logData->level, self::CLI_LEVEL_COLOR[$logData->level]);
-        if ($logData->tags) {
-            $output .= Tools::cliColor(' [' . implode(', ', $logData->tags) . ']', Tools::COLOR_GRAY);
-        }
-        if (isset(self::$errorLevel[$logData->level])) {
+            . ' ' . self::cliColor($logData->level, self::CLI_LEVEL_COLOR[$logData->level]);
+        if ($logData->tags)
+            $output .= self::cliColor(' [' . implode(', ', $logData->tags) . ']', self::COLOR_GRAY);
+        if (isset(self::$_errorLevel[$logData->level])) {
             if ($logData->fields) {
-                $output .= ' ' . Tools::cliColor(json_encode($logData->fields), Tools::COLOR_GRAY);
+                $output .= ' ' . self::cliColor(json_encode($logData->fields), self::COLOR_GRAY);
             }
             if ($logData->file) {
                 $output .= PHP_EOL . "\t" . $logData->file;
             }
         }
-        $output .= PHP_EOL . "\t" . str_replace(PHP_EOL, "\n\t", Tools::cliColor($logData->message, Tools::COLOR_GRAY2)) . PHP_EOL;
+        $output .= PHP_EOL . "\t" . str_replace(PHP_EOL, "\n\t", self::cliColor($logData->message, self::COLOR_GRAY2)) . PHP_EOL;
 
         if (isset($_SERVER['TERM'])) {
-            fwrite(STDERR, $output); // Ошибки в консоли можно залогировать толкьо так `&2 >>`
+            fwrite(\STDERR, $output); // Ошибки в консоли можно залогировать толкьо так `&2 >>`
         } else {
             // Для кронов, чтобы все логи по умолчанию выводились дефолтно черезе `>>`
-            fwrite(STDOUT, $output);
+            fwrite(\STDOUT, $output);
         }
     }
 
-    /**
-     * @param object $object
-     * @return array
-     */
-    public function getLogFromObject($object)
+    protected function htmlPrint(LogData $logData)
+    {
+        if (isset(self::$_errorLevel[$logData->level]) && $this->getViewer()) {
+            echo $this->getViewer()->renderItemLog($logData);
+        }
+    }
+
+    protected function getLogFromObject($object)
     {
         $fields = [];
         $mess = get_class($object);
 
         if (method_exists($object, 'getCode')) {
-            $fields[self::FIELD_EXC_CODE] = $object->getCode();
+            $fields['exception_code'] = $object->getCode();
         }
 
         if (method_exists($object, 'getMessage') && $object->getMessage()) {
@@ -720,10 +654,23 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         if (method_exists($object, 'getTrace')) {
-            $fields[self::FIELD_TRICE] = $this->renderDebugTrace($object->getTrace(), 0, static::$limitTrace);
+            $fields[self::FIELD_TRICE] = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
         }
 
         return [$mess, $fields];
+    }
+
+    protected static function checkTraceExclude($row, $lineExclude = null)
+    {
+        if ($lineExclude) {
+            if (!empty($row['file']) && strpos($row['file'], $lineExclude) !== false)
+                return true;
+            //            if (!empty($row['class']) && strpos($row['class'], $lineExclude)!==false)
+            //                return true;
+        }
+        if (!empty($row['file']) && strpos($row['file'], 'PhpErrorCatcher') !== false)
+            return true;
+        return false;
     }
 
     /*****************************************************/
@@ -731,284 +678,641 @@ class PhpErrorCatcher implements LoggerInterface
 
     public static function addGlobalTag($tag)
     {
-        static::$logTags[] = $tag;
+        self::init()->logTags[] = $tag;
     }
 
     public static function addGlobalTags(array $tags)
     {
-        foreach ($tags as $tag) {
-            static::$logTags[] = $tag;
-        }
+        self::init()->logTags = array_merge(self::init()->logTags, $tags);
     }
 
     public static function addGlobalField($key, $val)
     {
-        static::$logFields[$key] = $val;
+        self::init()->logFields[$key] = $val;
     }
 
-    public static function getErrCount()
+
+    /**
+     * @param string $mess
+     * @return void
+     */
+    public static function setViewAlert($mess)
     {
-        return static::$obj->errCount;
+        self::$_viewAlert[] = $mess;
+    }
+
+    /**
+     * @param string[] $levels
+     * @return int
+     */
+    public function getCountByLevelAndLess($levels)
+    {
+        $cnt = 0;
+        foreach ($levels as $level) {
+            $cnt += isset($this->countByLevel[$level]) ? $this->countByLevel[$level] : 0;
+        }
+        return $cnt;
+    }
+
+    /**
+     * @return ?string
+     */
+    public function getHighLevelLogs()
+    {
+        for ($i = LOG_EMERG; $i <= LOG_DEBUG; $i++) {
+            if (isset($this->countByLevel[self::$logLevel[$i]])) {
+                return self::$logLevel[$i];
+            }
+        }
+        return null;
     }
 
     public static function startCatchLog()
     {
-        self::$userCatchLogFlag = true;
+        self::$_userCatchLogFlag = true;
     }
 
-//    public static function flushCatchLog()
+    public static function flushCatchLog()
+    {
+        // TODO
+        //        $log = '';//self::init()->getRenderLogs();
+        //        try {
+        //            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
+        //                //$logs .= $this->renderItemLog($logData);
+        //            }
+        //        } catch (\Exception $e) {
+        //            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
+        //        }
+        //        self::$_userCatchLogFlag = false;
+        //        return $log;
+    }
+
+//    public static function getRenderLogs()
 //    {
-//        // TODO
-//        $log = '';//self::init()->getRenderLogs();
-//        try {
-//            foreach (self::init()->getDataLogsGenerator() as $key => $logData) {
-//                //$logs .= $this->renderItemLog($logData);
-//            }
-//        } catch (\Throwable $e) {
-//            $logs .= '<hr/><pre>'.$e->__toString().'</pre>!!!!';
-//        }
-//        self::$_userCatchLogFlag = false;
-//        return $log;
+//        $logger = self::init();
+//        return $logger->getViewer()
+//            ->renderAllLogs(storage\FileStorage::getDataHttp(), $logger->getDataLogsGenerator());
+//
 //    }
 
-    public static function renderLogs()
+    /**
+     * Профилирование алгоритмов и функций отдельно
+     * @param null $timeOut
+     */
+    public static function funcStart()
     {
-        $logger = self::init();
-        FileViewer::renderAllLogs(storage\FileStorage::createHttpData(), $logger->getDataLogsGenerator());
-//        foreach ($logger->getDataLogsGenerator() as $logData) {
-//            FileViewer::renderItemLog($logData);
+        static::$_functionStartTime = microtime(true);
+//        static::$_functionTimeOut = $timeOut;
+    }
+
+    public static function funcEnd()
+    {
+        // TODO
+        $timer = (microtime(true) - static::$_functionStartTime) * 1000;
+        self::funcStart();
+        return $timer;
+//        if (static::$_functionTimeOut && $timer < static::$_functionTimeOut) {
+//            return null;
 //        }
+//        return static::$_obj->saveStatsProfiler($name, $info, $simple);
+    }
+
+    protected static $tick;
+
+    public static function tickTrace($slice = 1, $limit = 3)
+    {
+        // TODO
+        self::$tick = array_slice(debug_backtrace(), $slice, $limit);
+    }
+
+    /**
+     * Экранирование
+     * @param $value string
+     * @return string
+     */
+    public static function _e($value)
+    {
+        if (!is_string($value)) {
+            $value = self::safe_json_encode($value, JSON_UNESCAPED_UNICODE);
+        }
+        return htmlspecialchars((string)$value, ENT_NOQUOTES | ENT_IGNORE, 'utf-8');
+    }
+
+    /**
+     * @param $arg
+     * @return array|string
+     */
+    public static function arrayToLower($arg)
+    {
+        if (is_array($arg)) {
+            $arg = array_map('mb_strtolower', $arg);
+            $arg = array_change_key_case($arg, CASE_LOWER);
+            return $arg;
+        } else {
+            return mb_strtolower($arg);
+        }
+    }
+
+    public static function renderDebugArray($arr, $arrLen = 6, $strLen = 256)
+    {
+        if (!is_array($arr)) return $arr;
+        $i = $arrLen;
+        $args = [];
+
+        foreach ($arr as $k => $v) {
+            if ($i == 0) {
+                $args[] = '...' . (count($arr) - 6) . ']';
+                break;
+            }
+            $prf = '';
+            if (!is_numeric($k))
+                $prf = $k . ':';
+            if (is_null($v))
+                $args[] = $prf . 'NULL';
+            else if (is_array($v))
+                $args[] = $prf . '[' . implode(', ', self::renderDebugArray($v, $arrLen, $strLen)) . ']';
+            else if (is_object($v))
+                $args[] = $prf . get_class($v);
+            else if (is_bool($v))
+                $args[] = $prf . ($v ? 'T' : 'F');
+            else if (is_resource($v))
+                $args[] = $prf . 'RESOURCE';
+            else if (is_numeric($v))
+                $args[] = $prf . $v;
+            else if (is_string($v)) {
+                $l = mb_strlen($v);
+                if ($l > $strLen) {
+                    $v = mb_substr($v, 0, $strLen - 30) . '...(' . $l . ')...' . mb_substr($v, $l - 20);
+                }
+                $args[] = $prf . '"' . preg_replace(["/\n+/u", "/\r+/u", "/\s+/u"], ['', '', ' '], $v) . '"';
+            } else {
+                $args[] = $prf . 'OVER';
+            }
+            $i--;
+        }
+        return $args;
     }
 
     /***************************************************/
 
+    public function setSafeParams()
+    {
+        if ($this->_postData !== null) return;
+        $this->_postData = [];
+
+        if ($this->enablePostLog) {
+            if ($_POST) {
+                foreach ($_POST as $k => $p) {
+                    $size = mb_strlen(serialize((array)$this->_postData[$k]), '8bit');
+                    if ($size > 1024)
+                        $this->_postData[$k] = '...(' . $size . 'b)...';
+                    else
+                        $this->_postData[$k] = $p;
+                }
+            } elseif (isset($_SERVER['argv'])) {
+                $this->_postData = $_SERVER['argv'];
+            }
+        }
+
+        if ($this->enableCookieLog) {
+            $this->_cookieData = $_COOKIE;
+        }
+        if ($this->enableSessionLog) {
+            $this->_sessionData = $_SESSION;
+        }
+
+        if ($this->safeParamsKey && ($this->_postData || $this->_cookieData || $this->_sessionData)) {
+            foreach ($this->safeParamsKey as $key) {
+                if (isset($this->_postData[$key])) {
+                    $this->_postData[$key] = '***';
+                }
+                if ($this->_cookieData && isset($this->_cookieData[$key])) {
+                    $this->_cookieData[$key] = '***';
+                }
+                if ($this->_sessionData && isset($this->_sessionData[$key])) {
+                    $this->_sessionData[$key] = '***';
+                }
+            }
+        }
+    }
+
     /**
-     * Trace print
-     * @param mixed|null $trace
+     * Распечатка трейса
+     * @param array $trace
      * @param int $start
      * @param int $limit
-     * @param array $lineExclude
+     * @param string $lineExclude
      * @return string
      */
-    public function renderDebugTrace($trace = null, $start = 0, $limit = 10, array $lineExclude = [])
+    public function renderDebugTrace($trace = null, $start = 0, $limit = 10, $lineExclude = '')
     {
-        if (is_string($trace)) {
-            return $trace;
-        }
-        if (!$trace) {
-            $trace = debug_backtrace(static::$traceShowArgs ? DEBUG_BACKTRACE_PROVIDE_OBJECT : DEBUG_BACKTRACE_IGNORE_ARGS, $limit + 3);
-        }
+        if (is_string($trace)) return $trace;
+        if (!$trace) $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $limit + 3);
         $res = '';
 
         foreach ($trace as $i => $row) {
-            if ($i < $start) {
-                continue;
-            }
+            if ($i < $start) continue;
             if (is_array($row) && (!empty($row['file']) || !empty($row['function']))) {
-                if (Tools::isTraceHasExclude($row, $lineExclude)) {
-                    continue;
+                if (self::checkTraceExclude($row, $lineExclude)) continue;
+                $res .= '#' . $i . ' ' . (!empty($row['file']) ? $this->getRelativeFilePath($row['file']) . ':' . $row['line'] . ' ' : '');
+
+                if ($this->isFullTrace) {
+                    $args = '';
+                    if ($this->debugMode && !empty($row['args'])) {
+                        $args = implode(', ', self::renderDebugArray($row['args']));
+                    }
+                    $res .= (!empty($row['class']) ? $row['class'] . '::' : '')
+                        . (!empty($row['function']) ? $row['function'] . '(' . $args . ')' : '');
                 }
-                $args = '';
-                if (!empty($row['args'])) {
-                    $args = implode(', ', Tools::renderDebugArray($row['args'], $i > 0 ? 6 : 15, $i > 0 ? 255 : 5000));
-                }
-                $res .= '#' . $i . ' ';
-                if (!empty($row['file'])) {
-                    $res .= '|' . $this->getRelativeFilePath($row['file']) . ':' . $row['line'] . '| ';
-                }
-                $res .= (!empty($row['class']) ? $row['class'] . '::' : '')
-                    . (!empty($row['function']) ? $row['function'] . '(' . $args . ')' : '') . PHP_EOL;
+                $res .= PHP_EOL;
             } else {
-                if (!is_string($row)) {
-                    $row = json_encode($row, JSON_UNESCAPED_UNICODE);
-                }
-                $res .= mb_substr('@ ' . $row, 0, 1024) . PHP_EOL;
+                $res .= mb_substr('@ ' . (is_string($row) ? $row : json_encode($row, JSON_UNESCAPED_UNICODE)), 0, 1024) . PHP_EOL;
             }
-            if ($i >= $limit) {
-                break;
-            }
+            if ($i >= $limit) break;
         }
         return $res;
     }
 
-    /**
-     * @param array $lineExclude
-     * @return string
-     */
-    protected function getFileLineByTrace(array $lineExclude = [])
+
+    public function getFileLineByTrace($start = 2, $lineExclude = null)
     {
-        $trace = array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 6), 2);
-        $res = Tools::getFileLineByTrace($trace, $lineExclude);
-        if ($res) {
-            $res = $this->getRelativeFilePath($res);
+        $res = '';
+        foreach (array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 6), $start) as $row) {
+            if (self::checkTraceExclude($row, $lineExclude))
+                continue;
+            if (!empty($row['file']))
+                return $this->getRelativeFilePath($row['file']) . ':' . $row['line'];
+            return (!empty($row['class']) ? $row['class'] . '::' : '')
+                . (!empty($row['function']) ? $row['function'] . '()' : '');
         }
-        return $res;
+        return '-';
     }
 
-    /**
-     * @param string $file
-     * @return string
-     */
     public function getRelativeFilePath($file)
     {
-        return str_replace(static::$dirRoot, '', $file);
+        return str_replace($this->dirRoot, '.', $file);
     }
 
-    /**
-     * @param string $key
-     * @return LogData|null
-     */
-    protected function getLogDataFromCache($key)
+    public function getRawLogFile()
     {
-        $data = $this->cache()->get($key);
-        $raw = json_decode($data, true);
-        if (!is_array($raw)) {
+        return $this->dirRoot . '/raw.' . storage\FileStorage::FILE_EXT;
+    }
+
+    public static function renderVars($var, $depth = 3, $highlight = false) {
+        return self::dumpAsString($var, $depth = 3);
+    }
+
+    private static $objects = [];
+    public static function dumpAsString($var, $depth = 3, $highlight = false)
+    {
+        $output = self::dumpInternal($var, $depth, 0);
+        if ($highlight) {
+            $result = highlight_string("<?php\n" . $output, true);
+            $output = preg_replace('/&lt;\\?php<br \\/>/', '', $result, 1);
+        }
+        self::$objects = [];
+        return $output;
+    }
+
+    private static function dumpInternal($var, $depth, $level = 0)
+    {
+        $output = '';
+        switch (gettype($var)) {
+            case 'boolean':
+                $output .= $var ? 'T' : 'F';
+                break;
+            case 'integer':
+            case 'double':
+                $output .= (string)$var;
+                break;
+            case 'string':
+                $limitString = static::init()->limitString;
+                $size = mb_strlen($var);
+                if ($size > $limitString) {
+                    $output = '"' . static::_e(mb_substr($var, 0, $limitString)) . '...(' . $size . 'b)"';
+                }
+                else {
+                    $output = '"' . static::_e($var) . '"';
+                }
+                break;
+            case 'resource':
+                $output .= '{resource}';
+                break;
+            case 'NULL':
+                $output .= 'null';
+                break;
+            case 'unknown type':
+                $output .= '{unknown}';
+                break;
+            case 'array':
+                if ($depth <= $level) {
+                    $output .= '[...]';
+                } elseif (empty($var)) {
+                    $output .= '[]';
+                } else {
+                    $spaces = str_repeat(' ', $level * 4);
+                    $output .= '[';
+                    foreach ($var as $key => $val) {
+                        $output .= "\n" . $spaces . '    ';
+                        $output .= self::dumpInternal($key, $depth, 0);
+                        $output .= ' => ';
+                        $output .= self::dumpInternal($val, $depth, $level + 1);
+                    }
+                    $output .= "\n" . $spaces . ']';
+                }
+                break;
+            case 'object':
+                $id = array_search($var, self::$objects, true);
+                if ($id !== false) {
+                    $output .= get_class($var) . '#' . ($id + 1) . '(...)';
+                } elseif ($depth <= $level) {
+                    $output .= get_class($var) . '(...)';
+                } else {
+                    $id = array_push(self::$objects, $var);
+                    $className = get_class($var);
+                    $spaces = str_repeat(' ', $level * 4);
+                    $output .= "$className#$id\n" . $spaces . '(';
+                    if ('__PHP_Incomplete_Class' !== get_class($var) && method_exists($var, '__debugInfo')) {
+                        $dumpValues = $var->__debugInfo();
+                        if (!is_array($dumpValues)) {
+                            throw new \Exception('__debuginfo() must return an array');
+                        }
+                    } else {
+                        $dumpValues = (array) $var;
+                    }
+                    foreach ($dumpValues as $key => $value) {
+                        $keyDisplay = strtr(trim($key), "\0", ':');
+                        $output .= "\n" . $spaces . "    [$keyDisplay] => ";
+                        $output .= self::dumpInternal($value, $depth, $level + 1);
+                    }
+                    $output .= "\n" . $spaces . ')';
+                }
+                break;
+        }
+        return $output;
+    }
+
+    public function getLogDataFromMemcache($key)
+    {
+        $raw = $this->memcache()->get($key);
+        $obj = json_decode($raw, true);
+        $logData = new LogData;
+        if (!is_array($obj)) {
+            echo 'Error: ' . $key . ' : ' . $raw . PHP_EOL;
             return null;
         }
-        return LogData::init($raw);
-    }
-
-    /**
-     * @param array $context
-     * @return array
-     */
-    protected function collectTagsAndFields(array $context)
-    {
-        $tags = $fields = [];
-        foreach ($context as $k => $v) {
-            if (is_numeric($k)) {
-                $tags[] = $v;
-            } else {
-                $fields[$k] = $v;
-            }
+        foreach ($obj as $prop => $val) {
+            $logData->{$prop} = $val;
         }
-
-        if (static::$logCookieKey && !empty($_COOKIE[static::$logCookieKey])) {
-            // для поиска только нужных логов
-            $tags[] = $_COOKIE[static::$logCookieKey];
-        }
-
-        if (count(static::$logTags)) {
-            $tags = array_merge($tags, static::$logTags);
-        }
-        if (count(static::$logFields)) {
-            $fields = array_merge(static::$logFields, $fields);
-        }
-
-        if (!isset($fields[self::FIELD_LOG_TYPE])) {
-            $fields[self::FIELD_LOG_TYPE] = self::TYPE_LOGGER;
-        }
-        return [$tags, $fields];
+        return $logData;
     }
 
     /***************************************************/
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function emergency($message, array $context = [])
+    public function emergency($message, array $tags = [], array $fields = [])
     {
-        $context[] = 'emergency';
-        $this->log(self::LEVEL_CRITICAL, $message, $context);
+        $level = self::LEVEL_ALERT;
+        $tags[] = 'emergency';
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function alert($message, array $context = [])
+    public function alert($message, array $tags = [], array $fields = [])
     {
-        $context[] = 'alert';
-        $this->log(self::LEVEL_CRITICAL, $message, $context);
+        $level = self::LEVEL_ALERT;
+        $tags[] = 'alert';
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function critical($message, array $context = [])
+    public function critical($message, array $tags = [], array $fields = [])
     {
-        $this->log(self::LEVEL_CRITICAL, $message, $context);
+        $level = self::LEVEL_CRITICAL;
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function error($message, array $context = [])
+    public function error($message, array $tags = [], array $fields = [])
     {
-        $this->log(self::LEVEL_ERROR, $message, $context);
+        $level = self::LEVEL_ERROR;
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function warning($message, array $context = [])
+    public function warning($message, array $tags = [], array $fields = [])
     {
-        $this->log(self::LEVEL_WARNING, $message, $context);
+        $level = self::LEVEL_WARNING;
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function notice($message, array $context = [])
+    public function notice($message, array $tags = [], array $fields = [])
     {
-        $this->log(self::LEVEL_NOTICE, $message, $context);
+        $level = self::LEVEL_NOTICE;
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    public function info($message, array $context = [])
+    public function info($message, array $tags = [], array $fields = [])
     {
-        $this->log(self::LEVEL_INFO, $message, $context);
+        $level = self::LEVEL_INFO;
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param $message
-     * @param array $context
-     * @return void
-     */
-    public function debug($message, array $context = [])
+    public function debug($message, array $tags = [], array $fields = [])
     {
-        $this->log(self::LEVEL_DEBUG, $message, $context);
+        $level = self::LEVEL_DEBUG;
+        return $this->log($level, $message, $tags, $fields);
     }
 
-    /**
-     * @param $level
-     * @param mixed $message
-     * @param array $context
-     * @return void
-     */
-    public function log($level, $message, array $context = [])
+    public static function logger($level, $message, $tags = [], array $fields = [])
     {
-        if (!static::$debugMode && $level === self::LEVEL_DEBUG) {
-            return;
+        return static::init()->log($level, $message, $tags, $fields);
+    }
+
+    protected static $_byteMemoryLimit;
+
+    public static function isMemoryOver()
+    {
+        $limitMemory = ini_get('memory_limit');
+        if ($limitMemory > 0) {
+            if (!self::$_byteMemoryLimit)
+                self::$_byteMemoryLimit = (int)$limitMemory * (strpos($limitMemory, 'K') ? 1024 : (strpos($limitMemory, 'M') ? 1024 * 1024 : (strpos($limitMemory, 'G') ? 1024 * 1024 * 1024 : 1))) * 0.9;
+            return memory_get_usage() >= self::$_byteMemoryLimit;
         }
-        if ($this->count >= 100) {
-            if ($this->count == 100) {
-                echo '<p>To many Logs</p>';
+        return false;
+    }
+
+    /**
+     * @param mixed $msg
+     * @param array $tags
+     * @param array $fields
+     * @param string $level
+     * @return bool
+     */
+    public function log($level, $msg, array $tags = [], array $fields = [])
+    {
+        if (!$this->debugMode && $level === self::LEVEL_DEBUG) return true;
+        if (!isset($fields[self::FIELD_LOG_TYPE])) $fields[self::FIELD_LOG_TYPE] = self::TYPE_LOGGER;
+
+        if (count($this->ignoreRules)) {
+            foreach ($this->ignoreRules as $rule) {
+                $i = count($rule);
+                if (!empty($rule['level']) && $rule['level'] == $level) $i--;
+                if (!empty($rule['type']) && $rule['type'] == $fields[self::FIELD_LOG_TYPE]) $i--;
+                if (!empty($rule['message']) && is_string($msg) && $rule['message'] == $msg) $i--;
+                if ($i == 0) return true;
             }
+        }
+
+        if (isset(self::$_errorLevel[$level])) {
+            if (!isset($this->countByLevel[$level])) {
+                $this->countByLevel[$level] = 0;
+            }
+            $this->countByLevel[$level]++;
+        }
+        $this->_count++;
+
+        if ($this->_count == 1000) {
+            //TODO: cli print
+            echo '<p>To many Logs</p>';
+        } elseif ($this->_count > 100) {
+            // TODO: print in cli mode
             return;
         }
 
-        $logData = $this->createLogData($level, $message, $context);
-
-        if ($this->checkRules($logData, static::$ignoreRules)) {
-            return;
+        if (is_object($msg)) {
+            // если это эксепшн и другие подобные объекты
+            list($msg, $fields2) = $this->getLogFromObject($msg);
+            if ($fields2) $fields = array_merge($fields, $fields2);
+        } elseif (!is_string($msg)) {
+            $msg = static::renderVars($msg);
         }
+
+        $logData = new LogData;
+
+        if ($this->debugMode) {
+            $logData->message = mb_substr($msg, 0, 10000);
+        } else {
+            $logData->message = mb_substr($msg, 0, 8000);
+        }
+
+        $logData->message = $msg;
+        $logData->level = $level;
+        $logData->levelInt = array_search($level, self::$logLevel);
+
+        if (count($this->logTags)) {
+            $tags = array_merge($tags, $this->logTags);
+        }
+        if (count($this->logFields)) {
+            $fields = array_merge($this->logFields, $fields);
+        }
+
+        if ($this->logCookieKey && !empty($_COOKIE[$this->logCookieKey])) {
+            // для поиска только нужных логов
+            array_push($tags, $_COOKIE[$this->logCookieKey]);
+        }
+
+        if (isset($fields[self::FIELD_TRICE]) && is_string($fields[self::FIELD_TRICE])) {
+            $logData->trace = $fields[self::FIELD_TRICE];
+        }
+        elseif (isset($this->logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE])) {
+            $logData->trace = $this->renderDebugTrace(isset($fields[self::FIELD_TRICE]) ? $fields[self::FIELD_TRICE] : null, 0, (int)$this->logTraceByLevel[$level]);
+        }
+
+        if (isset($fields[self::FIELD_NO_TRICE]))
+            unset($fields[self::FIELD_NO_TRICE]);
+
+        if (isset($fields[self::FIELD_TRICE]))
+            unset($fields[self::FIELD_TRICE]);
+
+        if (isset($fields[self::FIELD_FILE])) {
+            $logData->file = $fields[self::FIELD_FILE];
+            unset($fields[self::FIELD_FILE]);
+        } else {
+            $logData->file = $this->getFileLineByTrace();
+        }
+
+        $logData->type = $fields[self::FIELD_LOG_TYPE];
+        unset($fields[self::FIELD_LOG_TYPE]);
+
+
+        $logData->tags = array_values(array_unique(self::arrayToLower($tags)));
+        $logData->fields = $fields;
+        $logData->microtime = microtime(true);
+        $logData->logKey = 'phpeErCh_' . $this->getSessionKey() . '_' . md5($logData->message . $logData->file);
 
         $this->add($logData);
+
+        return true;
     }
+
+    static function safe_json_encode($value, $options = 0, $depth = 512)
+    {
+        $encoded = json_encode($value, $options, $depth);
+        switch (json_last_error()) {
+            case JSON_ERROR_NONE:
+                return $encoded;
+            case JSON_ERROR_DEPTH:
+                throw new \Exception('json_encode: Maximum stack depth exceeded');
+            case JSON_ERROR_STATE_MISMATCH:
+                throw new \Exception('json_encode: Underflow or the modes mismatch');
+            case JSON_ERROR_CTRL_CHAR:
+                throw new \Exception('json_encode: Unexpected control character found');
+            case JSON_ERROR_SYNTAX:
+                throw new \Exception('json_encode: Syntax error, malformed JSON');
+            case JSON_ERROR_UTF8:
+                return self::safe_json_encode(self::utf8ize($value), $options, $depth);
+            default:
+                throw new \Exception('json_encode: Unknown error');
+        }
+    }
+
+    static function utf8ize($mixed)
+    {
+        if (is_array($mixed)) {
+            foreach ($mixed as $key => $value) {
+                $mixed[$key] = self::utf8ize($value);
+            }
+        } else if (is_string($mixed)) {
+            $mixed = mb_convert_encoding($mixed, 'UTF-8');
+        }
+        return $mixed;
+    }
+}
+
+class LogData
+{
+    public $logKey;
+    public $message;
+    public $level;
+    public $levelInt;
+    public $type;
+    public $trace;
+    public $file;
+    public $tags = [];
+    public $fields = [];
+    public $microtime;
+    public $count = 1;
+
+    public function __toArray()
+    {
+        $data = [];
+        foreach (get_object_vars($this) as $k => $v) {
+            $data[$k] = $v;
+        }
+        return $data;
+    }
+
+    public function __toString()
+    {
+        return PhpErrorCatcher::safe_json_encode($this->__toArray(), JSON_UNESCAPED_UNICODE);
+    }
+}
+
+class HttpData
+{
+    public $is_console;
+    public $ip_addr;
+    public $host;
+    public $method;
+    public $url;
+    public $referrer;
+    public $scheme;
+    public $user_agent;
+    public $overMemory;
 }

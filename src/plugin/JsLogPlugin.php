@@ -7,15 +7,23 @@ use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 class JsLogPlugin extends BasePlugin
 {
 
+    /**
+     * If you want enable log-request, set this name
+     * @var null
+     */
     protected $catcherLogName = 'myCatcherLog';
-    protected $level = PhpErrorCatcher::LEVEL_NOTICE;
+    protected $catcherLogFileSeparate = true;
+    protected $level = PhpErrorCatcher::LEVEL_WARNING;
 
     function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
 
         if ($this->initGetKey && isset($_GET[$this->initGetKey])) {
+            $owner->setGlobalTag('JsLogPlugin');
             $this->initLogRequest($owner);
+//            header('Content-type: text/html; charset=UTF-8');
+//            echo $renderLog;
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['status' => 'ok']);
             exit();
@@ -31,10 +39,9 @@ class JsLogPlugin extends BasePlugin
             $_POST = json_decode(file_get_contents('php://input'), true);
         }
         if (!isset($_POST['m']) || !isset($_POST['u']) || !isset($_POST['r'])) exit();
-        $mess = str_replace('||', PHP_EOL, $_POST['m']);
-        $size = mb_strlen(serialize((array)$mess), '8bit');
-        if ($size > 1000)
-            $mess = mb_substr($mess, 0, 1000) . '...(' . $size . 'b)...';
+        $errstr = str_replace('||', PHP_EOL, $_POST['m']);
+        $size = mb_strlen(serialize((array)$errstr), '8bit');
+        if ($size > 1000) $errstr = mb_substr($errstr, 0, 1000) . '...(' . $size . 'b)...';
         $vars = [
             PhpErrorCatcher::FIELD_NO_TRICE => true,
             PhpErrorCatcher::FIELD_FILE => '',
@@ -42,13 +49,12 @@ class JsLogPlugin extends BasePlugin
             'url' => $_POST['u'],
             'referrer' => $_POST['r'],
             'userAgent' => isset($_POST['ua']) ? $_POST['ua'] : '',
-            'js',
-            $this->catcherLogName,
         ];
-        if (!empty($_POST['s'])) $vars[PHPErrorCatcher::FIELD_TRICE] = str_replace('||', PHP_EOL, $_POST['s']);
-        if (!empty($_POST['l'])) $vars[PHPErrorCatcher::FIELD_FILE] = $_POST['l'];
+        if (!empty($_POST['s'])) $vars[PhpErrorCatcher::FIELD_TRICE] = str_replace('||', PHP_EOL, $_POST['s']);
+        if (!empty($_POST['l'])) $vars[PhpErrorCatcher::FIELD_FILE] = $_POST['l'];
 
-        $owner->log($this->level, $mess, $vars);
+        $GLOBALS['skipRenderBackTrace'] = 1;
+        $owner->log($this->level, $errstr, ['js'], $vars);
 
     }
 

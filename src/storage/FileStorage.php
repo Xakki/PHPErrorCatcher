@@ -2,167 +2,107 @@
 
 namespace Xakki\PhpErrorCatcher\storage;
 
-use DateTimeImmutable;
-use Exception;
 use Generator;
-use Xakki\PhpErrorCatcher\dto\HttpData;
-use Xakki\PhpErrorCatcher\dto\LogData;
-use Xakki\PhpErrorCatcher\Tools;
+use Traversable;
+use Xakki\PhpErrorCatcher\HttpData;
+use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\LogData;
 
 /**
+ * Class FileStorage
+ * @package Xakki\PhpErrorCatcher\storage
  * @method string getLogPath()
+ * @method string getLogDir()
  * @method string getBackUpDir()
+ * @method int getLimitFileSize()
+ * @method string getByDir()
+ * @method string getByFile()
  */
 class FileStorage extends BaseStorage
 {
     /* Config */
+    protected $enableLogging = true;
+    protected $maxLevelInt = LOG_DEBUG;
     protected $logPath = '';
-    protected $tplPath = 'Y.m/d';
+    protected $tplPath = '%Y.%m/%d';
     protected $logDir = '/logsError';
     protected $backUpDir = '/_backUp';
     protected $limitFileSize = 10485760;
+    protected $tmpFile;
+    protected $isEmptyTmpFile = true;
+    protected $logKeys = [];
 
     const FILE_EXT = 'plog';
 
-    public function __destruct()
+    function __construct(PhpErrorCatcher $owner, $config = [])
     {
+        parent::__construct($owner, $config);
+        $this->tmpFile = $this->getFullLogDir() . 'tmp_' . microtime(true) . '_' . (isset($serverData['REMOTE_ADDR']) ? $serverData['REMOTE_ADDR'] : '');
+    }
+
+    function __destruct()
+    {
+        parent::__destruct();
         if ($this->owner->needSaveLog()) {
-            if ($this->putData($this->owner->getDataLogsGenerator())) {
-                $this->owner->successSaveLog();
-            }
+            $this->finishSave();
+        }
+
+        if (file_exists($this->tmpFile))  {
+            unlink($this->tmpFile);
         }
     }
 
-    /**
-     * @param Generator $logs
-     * @return string
-     * @throws Exception
-     */
-    public static function serializeLogs(Generator $logs)
+
+    function write(LogData $logData) {
+        if (!$this->enableLogging) return;
+        if ($this->maxLevelInt && $logData->levelInt > $this->maxLevelInt) {
+            return;
+        }
+        $this->mkdir($this->getFullLogDir());
+
+        if (isset($this->logKeys[$logData->logKey])) {
+            file_put_contents($this->tmpFile, ', "'.$logData->logKey.'"', FILE_APPEND);
+            return;
+        }
+        $this->logKeys[$logData->logKey] = 1;
+        $res = file_put_contents($this->tmpFile, ($this->isEmptyTmpFile ? '' : ',') . $logData->__toString(), FILE_APPEND);
+        if ($this->isEmptyTmpFile) {
+            if ($res) chmod($this->tmpFile, 0666);
+        }
+
+        $this->isEmptyTmpFile = false;
+    }
+
+    private function getFullLogDir()
     {
-        $data = [
-            'http' => self::createHttpData()->__toArray(),
-            'logs' => iterator_to_array($logs),
-        ];
-        return str_replace(PHP_EOL, '\\n', Tools::safeJsonEncode($data, JSON_UNESCAPED_UNICODE));
+        return rtrim($this->logPath, '/') . '/'.trim($this->logDir, '/') . '/';
     }
 
     /**
-     * @param string $line
-     * @return array<HttpData, LogData>
-     * @throws Exception
+     * @return void
      */
-    public static function unSerializeFileLine($line)
+    private function finishSave()
     {
-        $data = json_decode($line, true);
-        if (!$data['http'] || !$data['logs']) {
-            throw new Exception('Not support line');
-        }
-        return [
-            'http' => HttpData::init($data['http']),
-            'logs' => self::getGenerator($data['logs']),
-        ];
-    }
-
-    /**
-     * @param array $logs
-     * @return Generator
-     */
-    public static function getGenerator(array $logs)
-    {
-        foreach ($logs as $logData) {
-            $logData = LogData::init($logData);
-            yield $logData;
-        }
-    }
-
-    /**
-     * @param string $file
-     * @return Generator
-     * @throws Exception
-     */
-    public static function iterateFileLog($file)
-    {
-        if (!file_exists($file)) {
-            throw new Exception('No file');
-        }
-
-        $fileHandle = fopen($file, "r");
-        while (!feof($fileHandle)) {
-            $line = fgets($fileHandle);
-            if (!$line) {
-                continue;
-            }
-
-            yield FileStorage::unSerializeFileLine($line);
-
-            if (Tools::isMemoryOver()) {
-                fclose($fileHandle);
-                throw new Exception('Is memory over');
-            }
-        }
-        fclose($fileHandle);
-    }
-
-    /**
-     * @return HttpData
-     */
-    public static function createHttpData()
-    {
-        $data = new HttpData();
-        $serverData = $_SERVER;
-        if (!empty($serverData['REMOTE_ADDR'])) {
-            $data->ipAddr = $serverData['REMOTE_ADDR'];
-        }
-        if (!empty($serverData['HTTP_HOST'])) {
-            $data->host = substr($serverData['HTTP_HOST'], 0, 500);
-        } else {
-            $data->host = isset($serverData['HTTP_X_SERVER_NAME']) ? $serverData['HTTP_X_SERVER_NAME'] : (isset($serverData['SERVER_NAME']) ? $serverData['SERVER_NAME'] : '');
-        }
-        if (!empty($_SERVER['SHELL'])) {
-            $data->shell = implode(' ', $_SERVER['argv']);
-        }
-
-        if (!empty($serverData['REQUEST_METHOD'])) {
-            $data->method = $serverData['REQUEST_METHOD'];
-        }
-        if (!empty($serverData['REQUEST_URI'])) {
-            $data->url = substr($serverData['REQUEST_URI'], 0, 500);
-        }
-        if (!empty($serverData['HTTP_REFERER'])) {
-            $data->referrer = substr($serverData['HTTP_REFERER'], 0, 500);
-        }
-        if (!empty($serverData['REQUEST_SCHEME'])) {
-            $data->scheme = $serverData['REQUEST_SCHEME'];
-        }
-        if (!empty($serverData['HTTP_USER_AGENT'])) {
-            $data->userAgent = substr($serverData['HTTP_USER_AGENT'], 0, 500);
-        }
-        if (Tools::isMemoryOver()) {
-            $data->overMemory = true;
-        }
-        return $data;
-    }
-
-    /**
-     * @param LogData[] $log
-     * @return bool
-     */
-    private function putData(Generator $log)
-    {
+        if (!file_exists($this->tmpFile)) return;
         $lastSlash = strrpos($this->tplPath, '/');
-        $date = DateTimeImmutable::createFromFormat('U', time());
-        $fileName = $date->format(substr($this->tplPath, 0, $lastSlash));
+        $fileName = strftime(substr($this->tplPath, 0, $lastSlash));
 
-        $fileName = rtrim($this->logPath, '/') . '/' . trim($this->logDir, '/') . '/' . $fileName;
+        $fileName = $this->getFullLogDir() . $fileName;
 
         if (!file_exists($fileName)) {
-            $this->mkdir($fileName);
+            if(!$this->mkdir($fileName)) {
+                fwrite(STDERR, 'Fail create log dir: ' . $fileName);
+                return;
+            }
         }
-//\Xakki\PhpErrorCatcher\PhpErrorCatcher::FIELD_LOG_NAME
-        $fileName = $fileName . '/' . $date->format(substr($this->tplPath, $lastSlash));
-        if ($this->owner->getErrCount()) {
-            $fileName .= '.err';
+
+        $fileName = $fileName . '/' . trim(strftime(substr($this->tplPath, $lastSlash)), '/');
+        $maxLevel = $this->owner->getHighLevelLogs();
+        if ($maxLevel) {
+            $fileName .= '.' . $maxLevel;
+        }
+        if ($tag = $this->owner->getGlobalTag()) {
+            $fileName .= '.' . $tag;
         }
         $fileName .= '.' . self::FILE_EXT;
 
@@ -170,38 +110,31 @@ class FileStorage extends BaseStorage
         if (file_exists($fileName)) {
             if (filesize($fileName) > $this->limitFileSize) {
                 $i = 0;
-                $preiosFile = '';
                 while (true) {
-                    $preiosFile = str_replace('.' . self::FILE_EXT, '_' . $i++ . '.' . self::FILE_EXT, $fileName);
-                    if (!file_exists($preiosFile)) {
-                        break;
-                    }
+                    $prevFile = str_replace('.' . self::FILE_EXT, '_' . $i++ . '.' . self::FILE_EXT, $fileName);
+                    if (!file_exists($prevFile)) break;
                 }
-                if (!rename($fileName, $preiosFile)) {
-//                    $fileLog .= '***** Cant rename big file';
+                if (!rename($fileName, $prevFile)) {
                     $flagNew = false;
                 }
-//                else {
-                //  href="' . $this->getFileUrl($preiosFile) . '"
-//                    $fileLog = '<a>Part # ' . $i . '. Previos file was to big</a><hr/>' . PHP_EOL . $fileLog;
-//                }
             } else {
                 $flagNew = false;
             }
         }
-        file_put_contents($fileName, $this->serializeLogs($log) . PHP_EOL, FILE_APPEND);
-        if ($flagNew) {
-            chmod($fileName, 0777);
-        }
-        return true;
+        $data = [
+            'http' => self::getDataHttp(),
+            'logs' => 1
+        ];
+
+        file_put_contents($fileName, mb_substr($this->toString($data), 0, -2) . '[', FILE_APPEND);
+        file_put_contents($fileName, file_get_contents($this->tmpFile) . ']}' . PHP_EOL, FILE_APPEND);
+        if ($flagNew) chmod($fileName, 0666);
     }
 
-    /**
-     * @param string $file
-     * @return bool
-     */
-    public function checkIsBackUp($file)
+    protected function toString($data)
     {
-        return strpos($file, $this->getLogPath() . $this->getBackUpDir()) !== false;
+        return str_replace(PHP_EOL, '\\n', PhpErrorCatcher::safe_json_encode($data, JSON_UNESCAPED_UNICODE));
     }
+
+
 }
