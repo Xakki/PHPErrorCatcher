@@ -2,21 +2,27 @@
 
 namespace Xakki\PhpErrorCatcher;
 
+/**
+ * @method PhpErrorCatcher getOwner()
+ */
 abstract class Base
 {
     protected PhpErrorCatcher $owner;
 
-    public function __construct(PhpErrorCatcher $owner, $config = [])
+    /**
+     * @param PhpErrorCatcher $owner
+     * @param array<string, string|int> $config
+     */
+    public function __construct(PhpErrorCatcher $owner, array $config = [])
     {
         $this->owner = $owner;
         $this->applyConfig($config);
     }
 
-//    function __destruct()
-//    {
-//
-//    }
-
+    /**
+     * @param array<string, string|int> $config
+     * @return void
+     */
     public function applyConfig(array $config): void
     {
         foreach ($config as $key => $value) {
@@ -26,6 +32,11 @@ abstract class Base
         }
     }
 
+    /**
+     * @param string $method
+     * @param ?array<int, mixed> $arguments
+     * @return mixed
+     */
     public function __call($method, $arguments = null)
     {
         $action = substr($method, 0, 3);

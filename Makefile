@@ -10,10 +10,10 @@ docker-build:
 bash:
 	$(docker) bash
 
-composer-install:
+composer-i:
 	$(composer) install
 
-composer-up:
+composer-u:
 	$(composer) update $(name)
 
 cs-fix:

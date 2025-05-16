@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Xakki\PhpErrorCatcher\viewer;
 
 use Xakki\PhpErrorCatcher\Base;
+use Xakki\PhpErrorCatcher\dto\LogData;
 
 /**
  * @method string getInitGetKey()
@@ -16,7 +17,8 @@ abstract class BaseViewer extends Base
     {
         $url = $_SERVER['REQUEST_URI'];
         $url = parse_url($url);
-        return $url['path'] . '?' . $this->getInitGetKey() . '=' . $end;
+        return ($url['path'] ?? '') . '?' . $this->getInitGetKey() . '=' . $end;
     }
 
+    abstract public function renderItemLog(LogData $logData): void;
 }

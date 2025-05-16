@@ -5,7 +5,7 @@ namespace Xakki\PhpErrorCatcher\contract;
 
 interface CacheInterface
 {
-    public function get($key);
+    public function get(string $key): mixed;
 
-    public function set($key, $value, $duration = null);
+    public function set(string $key, mixed $value, ?int $duration = null): void;
 }

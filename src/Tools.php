@@ -25,7 +25,7 @@ class Tools
         return "\033[" . $colorId . "m" . $text . "\033[0m";
     }
 
-    public static function utf8ize($mixed)
+    public static function utf8ize(mixed $mixed): mixed
     {
         if (is_array($mixed)) {
             foreach ($mixed as $key => $value) {
@@ -37,12 +37,19 @@ class Tools
         return $mixed;
     }
 
-    public static function safeJsonEncode($value, $options = 0, $depth = 512): string
+    /**
+     * @param mixed $value
+     * @param int   $options
+     * @param int<1, max>   $depth
+     * @return string
+     * @throws Exception
+     */
+    public static function safeJsonEncode(mixed $value, int $options = 0, int $depth = 512): string
     {
         $encoded = json_encode($value, $options, $depth);
         switch (json_last_error()) {
             case JSON_ERROR_NONE:
-                return $encoded ?? '';
+                return $encoded ?: '';
             case JSON_ERROR_DEPTH:
                 throw new Exception('json_encode: Maximum stack depth exceeded');
             case JSON_ERROR_STATE_MISMATCH:
@@ -58,16 +65,19 @@ class Tools
         }
     }
 
+    /**
+     * @param false|string $limitMemory
+     * @return int
+     */
     public static function convertMemoryToByte($limitMemory): int
     {
-        if ($limitMemory > 0) {
+        $m = 1;
+        if ($limitMemory) {
             if (strpos($limitMemory, 'G')) $m = 1024 * 1024 * 1024;
             elseif (strpos($limitMemory, 'M')) $m = 1024 * 1024;
             elseif (strpos($limitMemory, 'K')) $m = 1024;
-            else $m = 1;
-            $limitMemory = (int)$limitMemory * $m;
         }
-        return $limitMemory;
+        return (int) $limitMemory * $m;
     }
 
     public static function isMemoryOver(): bool
@@ -79,14 +89,17 @@ class Tools
         return false;
     }
 
+    /**
+     * @var object[]
+     */
     private static array $objects = [];
 
-    public static function dumpAsString(mixed $var, $limitString, int $depth = 3, bool $highlight = false): string
+    public static function dumpAsString(mixed $var, int $limitString, int $depth = 3, bool $highlight = false): string
     {
         $output = Tools::dumpInternal($var, $depth, $limitString);
         if ($highlight) {
             $result = highlight_string("<?php\n" . $output, true);
-            $output = preg_replace('/&lt;\\?php<br \\/>/', '', $result, 1);
+            $output = (string) preg_replace('/&lt;\\?php<br \\/>/', '', $result, 1);
         }
         self::$objects = [];
         return $output;
@@ -140,7 +153,7 @@ class Tools
             case 'object':
                 $id = array_search($var, self::$objects, true);
                 if ($id !== false) {
-                    $output .= get_class($var) . '#' . ($id + 1) . '(...)';
+                    $output .= get_class($var) . '#' . ((int) $id + 1) . '(...)';
                 } elseif ($depth <= $level) {
                     $output .= get_class($var) . '(...)';
                 } else {
@@ -168,7 +181,7 @@ class Tools
         return $output;
     }
 
-    public static function renderDebugArray(mixed $arr, $arrLen = 6, $strLen = 256): mixed
+    public static function renderDebugArray(mixed $arr, int $arrLen = 6, int $strLen = 256): mixed
     {
         if (!is_array($arr)) {
             return $arr;
@@ -211,6 +224,11 @@ class Tools
         return $args;
     }
 
+    /**
+     * @param string $str
+     * @param string[]  $exclude
+     * @return bool
+     */
     public static function containExclude(string $str, array $exclude): bool
     {
         foreach ($exclude as $item) {
@@ -221,12 +239,22 @@ class Tools
         return false;
     }
 
+    /**
+     * @param array<string, string> $traceItem
+     * @param string[] $exclude
+     * @return bool
+     */
     public static function isTraceHasExclude(array $traceItem, array $exclude): bool
     {
         $exclude[] = 'phperrorcatcher';
         return self::containExclude($traceItem['file'] ?? $traceItem['class'], $exclude);
     }
 
+    /**
+     * @param array<int, array<string, array|int|object|string>> $trace
+     * @param string[] $lineExclude
+     * @return string
+     */
     public static function getFileLineByTrace(array $trace, array $lineExclude = []): string
     {
         foreach ($trace as $item) {
@@ -251,6 +279,10 @@ class Tools
         return mb_strtolower($tag);
     }
 
+    /**
+     * @param array<string, string> $tags
+     * @return array<string, string>
+     */
     public static function prepareTags(array &$tags): array
     {
         array_walk($tags, function (&$v) {
@@ -259,7 +291,11 @@ class Tools
         return $tags;
     }
 
-
+    /**
+     * @param array<string, mixed> $fields
+     * @param string[] $excludeKeys
+     * @return array<string, string|int|float|bool>
+     */
     public static function prepareFields(array &$fields, array $excludeKeys): array
     {
         foreach ($excludeKeys as $key) {
@@ -276,6 +312,11 @@ class Tools
         return $fields;
     }
 
+    /**
+     * @param mixed $message
+     * @param int $limitString
+     * @return string
+     */
     public static function prepareMessage(&$message, int $limitString): string
     {
         if (!is_string($message)) {
@@ -305,7 +346,10 @@ class Tools
      */
     public static function delTree(string $dir): bool
     {
-        $files = array_diff(scandir($dir), [
+        $dirs = scandir($dir);
+        if (!$dirs) return false;
+
+        $files = array_diff($dirs, [
             '.',
             '..',
         ]);

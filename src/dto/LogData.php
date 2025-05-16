@@ -11,10 +11,17 @@ class LogData extends AbstractData implements Stringable
     public string $logKey;
     public string $message;
     public string $level;
+    public int $levelInt;
     public string $type;
     public ?string $trace = null;
     public string $file;
+    /**
+     * @var string[]
+     */
     public array $tags = [];
+    /**
+     * @var string[]|int[]|float[]|bool[]
+     */
     public array $fields = [];
     public float $timestamp;
     public int $count = 1;
@@ -23,4 +30,5 @@ class LogData extends AbstractData implements Stringable
     {
         return Tools::safeJsonEncode(get_object_vars($this), JSON_UNESCAPED_UNICODE);
     }
+
 }

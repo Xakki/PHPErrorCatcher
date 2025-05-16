@@ -11,7 +11,11 @@ class JsLogPlugin extends BasePlugin
     protected string $catcherLogName;
     protected string $level = PhpErrorCatcher::LEVEL_NOTICE;
 
-    function __construct(PhpErrorCatcher $owner, $config = [])
+    /**
+     * @param PhpErrorCatcher $owner
+     * @param mixed[]         $config
+     */
+    function __construct(PhpErrorCatcher $owner, array $config = [])
     {
         parent::__construct($owner, $config);
 
@@ -29,7 +33,7 @@ class JsLogPlugin extends BasePlugin
     public function initLogRequest(PhpErrorCatcher $owner): void
     {
         if (!count($_POST)) {
-            $_POST = json_decode(file_get_contents('php://input'), true);
+            $_POST = json_decode((string) file_get_contents('php://input'), true);
         }
         if (!isset($_POST['m']) || !isset($_POST['u']) || !isset($_POST['r'])) exit();
         $mess = str_replace('||', PHP_EOL, $_POST['m']);

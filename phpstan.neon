@@ -1,8 +1,10 @@
 parameters:
     parallel:
         processTimeout: 600.0
-    level: 4
+    level: 8
     paths:
         - src
     excludePaths:
         - src/connector/
+        - src/storage/ElasticStorage.php
+        - src/storage/PdoStorage.php

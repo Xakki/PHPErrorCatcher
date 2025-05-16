@@ -2,9 +2,9 @@ FROM php:8.2-cli-alpine
 
 WORKDIR /app
 
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer --1
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-RUN apk update && apk add git libzip-dev curl-dev -y
+RUN apk --no-cache  update && apk --no-cache add oniguruma-dev libzip-dev curl-dev
 RUN docker-php-ext-install curl mbstring zip pdo
 RUN docker-php-source delete && rm -rf /var/cache/apk/*
 

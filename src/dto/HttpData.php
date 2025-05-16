@@ -15,6 +15,9 @@ class HttpData extends AbstractData
     public bool $overMemory = false;
     public string $shell = '';
 
+    /**
+     * @return mixed[]
+     */
     public function __toArray(): array
     {
         return get_object_vars($this);
