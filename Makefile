@@ -10,20 +10,17 @@ docker-build:
 bash:
 	$(docker) sh
 
-composer-install:
-	$(composer) install
+composer-i:
+	$(composer) i
 
-composer-up:
-	$(composer) update $(name) --no-plugins
+composer-u:
+	$(composer) u $(name) --no-plugins
 
 cs-fix:
 	$(composer) cs-fix
 
 cs-check:
 	$(composer) cs-check
-
-test:
-	$(composer) phpunit
 
 psalm:
 	$(docker) vendor/bin/psalm

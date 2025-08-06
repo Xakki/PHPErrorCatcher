@@ -2,12 +2,16 @@
 
 namespace Xakki\PhpErrorCatcher;
 
+/**
+ * Class Base
+ * @package Xakki\PhpErrorCatcher
+ */
 abstract class Base
 {
     /**
      * @var PhpErrorCatcher
      */
-    protected $owner;
+    public $owner;
 
     /**
      * @param PhpErrorCatcher $owner
@@ -19,9 +23,8 @@ abstract class Base
         $this->applyConfig($config);
     }
 
-    function __destruct()
+    public function __destruct()
     {
-
     }
 
     /**
@@ -39,8 +42,8 @@ abstract class Base
 
     /**
      * @param string $method
-     * @param ?array $arguments
-     * @return null
+     * @param array|null $arguments
+     * @return mixed|null
      */
     public function __call($method, $arguments = null)
     {

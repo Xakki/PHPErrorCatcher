@@ -2,20 +2,19 @@
 
 namespace Xakki\PhpErrorCatcher\viewer;
 
-use Xakki\PhpErrorCatcher\LogData;
-use Xakki\PhpErrorCatcher\HttpData;
+use Xakki\PhpErrorCatcher\dto\LogData;
+use Xakki\PhpErrorCatcher\dto\HttpData;
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\storage\BaseStorage;
 use Xakki\PhpErrorCatcher\storage\FileStorage;
 
 class FileViewer extends BaseViewer
 {
-
     const VERSION = '0.1';
     /**
-     * Error list
-     * @var array
+     * @var array<string, array<string, mixed>>
      */
-    private $_errorListView = [
+    private $errorListView = [
         PhpErrorCatcher::LEVEL_CRITICAL => [
             'type' => '[Critical]',
             'color' => 'red',
@@ -54,13 +53,20 @@ class FileViewer extends BaseViewer
         ],
     ];
 
-    /* @var FileStorage */
+    /** @var FileStorage */
     protected $_fileStorage;
-    
+
+    /** @var string */
     protected $idePath;
+
+    /** @var string[] */
     public $extraLinks = ['HOME' => '?'];
 
-    function __construct(PhpErrorCatcher $owner, $config = [])
+    /**
+     * @param PhpErrorCatcher $owner
+     * @param array<string, mixed> $config
+     */
+    public function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
         if (empty($this->initGetKey)) {
@@ -75,7 +81,8 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Просмотр логов
+     * @return string
+     * @throws \Exception
      */
     public function renderView()
     {
@@ -97,7 +104,6 @@ class FileViewer extends BaseViewer
 
         if (!isset($_GET['only']) && empty($_GET['backup'])) {
             $this->renderViewHead($file);
-
         }
 
 
@@ -109,13 +115,13 @@ class FileViewer extends BaseViewer
         //        }
         //        else
         if ($file == 'rawlog') {
-            if (file_exists($this->_owner->getRawLogFile())) {
+            if (file_exists($this->owner->getRawLogFile())) {
                 if (!empty($_GET['del'])) {
-                    unlink($this->_owner->getRawLogFile());
+                    unlink($this->owner->getRawLogFile());
                     echo '--empty--';
                 } else {
                     echo '<p><a href="' . $this->getHomeUrl('') . 'rawlog&del=1" class="linkDel">Удалить</a></p>';
-                    echo $this->renderJsonLogs($this->_owner->getRawLogFile());
+                    echo $this->renderJsonLogs($this->owner->getRawLogFile());
                 }
             } else {
                 echo '--empty--';
@@ -124,13 +130,19 @@ class FileViewer extends BaseViewer
             phpinfo();
         } elseif ($file == 'Memcached') {
             print_r('<pre>');
-            print_r($this->_owner->memcache()->getStats());
+            if ($this->owner->memcache() instanceof \Memcached) {
+                print_r($this->owner->memcache()->getStats());
+            } else {
+                echo 'No Memcached';
+            }
             print_r('</pre>');
         } elseif ($file == 'storage') {
             list($st, $fn) = explode('/', $_GET['fname']);
             echo '<p>';
-            if ($this->_owner->getStorage($st) && method_exists($this->_owner->getStorage($st), 'action'.$fn)) {
-                echo call_user_func([$this->_owner->getStorage($st), 'action'.$fn]);
+            /** @var BaseStorage $storageClass */
+            $storageClass = $this->owner->getStorage($st);
+            if ($storageClass && method_exists($storageClass, 'action' . $fn)) {
+                echo call_user_func([$storageClass, 'action' . $fn]);
             } else {
                 echo 'No action call';
             }
@@ -175,28 +187,30 @@ class FileViewer extends BaseViewer
         if (!isset($_GET['only'])) {
             echo '</body></html>';
         }
+        return '';
     }
 
     /**
-     * рендер заголовка HTML
-     * @param $file
-     * @return string
+     * @param string $file
+     * @return void
      */
     public function renderViewHead($file)
     {
+        $view = $this;
         include __DIR__ . '/file/tpl.php';
     }
 
     /**
-     * Просмотр Директории логов
      * @param string $path
-     * @return array
+     * @return array<string, array<int, mixed>>
      */
     public function viewGetDirList($path = '')
     {
         $dirList1 = $dirList2 = [];
         $path = trim($path, '/.');
-        if ($path) $path = '/' . $path;
+        if ($path) {
+            $path = '/' . $path;
+        }
         $fullPath = $this->_fileStorage->getLogPath() . $path;
 
         if (!file_exists($fullPath)) {
@@ -270,8 +284,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Рендер директории логов
-     * @param $dirList
+     * @param array<string, array<int, mixed>> $dirList
      * @return string
      */
     public function renderViewDirList($dirList)
@@ -294,8 +307,8 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Делаем бекап фаила и ссылку на него
-     * @param $file
+     * @param string $file
+     * @return void
      */
     private function viewCreateBackUp($file)
     {
@@ -336,8 +349,8 @@ class FileViewer extends BaseViewer
 
                 // add info
                 file_put_contents($backUpFile, PHP_EOL . '<hr/><a href="' . $loc . '">This backup file in ' . date('Y-m-d H:i:s') . ' from origin</a>', FILE_APPEND);
-                if ($_GET['backup'] == 'del' and strpos($file, $this->_fileStorage->getLogPath() . $this->_fileStorage->getBackUpDir()) === false) {
-                    //
+                if ($_GET['backup'] == 'del' && strpos($file, $this->_fileStorage->getLogPath() . $this->_fileStorage->getBackUpDir()) === false) {
+                    $loc = '';
                 } else {
                     // add info
                     file_put_contents($file, '... <a href="' . $backUpFileUrl . '">This file was backup ' . date('Y-m-d H:i:s') . '</a><hr/>' . PHP_EOL);
@@ -351,8 +364,8 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Бекапи логи
-     * @param $dir
+     * @param string $dir
+     * @return void
      */
     private function viewCreateBackUpDir($dir)
     {
@@ -379,8 +392,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Хлебные крошки
-     * @param $url
+     * @param string $url
      * @return string
      */
     private function renderViewBreadCrumb($url)
@@ -398,6 +410,9 @@ class FileViewer extends BaseViewer
         return '<nav aria-label="breadcrumb"><ol class="breadcrumb">' . $ctr . '</ol></nav>';
     }
 
+    /**
+     * @return string
+     */
     private function getPreviosUrl()
     {
         $temp = preg_split('/\//', $_GET[$this->initGetKey], -1, PREG_SPLIT_NO_EMPTY);
@@ -409,6 +424,10 @@ class FileViewer extends BaseViewer
     /*********************************/
 
 
+    /**
+     * @param string $file
+     * @return bool
+     */
     private function checkIsBackUp($file)
     {
         return (strpos($file, $this->_fileStorage->getLogPath() . $this->_fileStorage->getBackUpDir()) !== false);
@@ -416,8 +435,7 @@ class FileViewer extends BaseViewer
 
 
     /**
-     * Рекурсивно удаляем директорию
-     * @param $dir
+     * @param string $dir
      * @return bool
      */
     public static function delTree($dir)
@@ -432,6 +450,10 @@ class FileViewer extends BaseViewer
         return rmdir($dir);
     }
 
+    /**
+     * @param string $file
+     * @return string
+     */
     public function getFileContent($file)
     {
         // if ()
@@ -440,16 +462,20 @@ class FileViewer extends BaseViewer
         $is_img = @getimagesize($file);
         $pathinfo['extension'] = !empty($pathinfo['extension']) ? $pathinfo['extension'] : '';
         if ($is_img) {
-            return '<br/><img src="' . $this->_owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
+            return '<br/><img src="' . $this->owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
         } elseif ($pathinfo['extension'] == 'html' || isset($_GET['only'])) {
             return file_get_contents($file);
         } elseif ($pathinfo['extension'] == FileStorage::FILE_EXT) {
             return $this->renderJsonLogs($file);
         } else {
-            return '<pre>' . file_get_contents($file) . '</pre>';
+            return '<pre>' . htmlspecialchars(file_get_contents($file), ENT_QUOTES) . '</pre>';
         }
     }
 
+    /**
+     * @param string $realFilePath
+     * @return string
+     */
     public function getFileUrl($realFilePath)
     {
         $realFilePath = str_replace($this->_fileStorage->getLogPath(), '', $realFilePath);
@@ -462,17 +488,26 @@ class FileViewer extends BaseViewer
     /*******************************************************/
     /*******************************************************/
 
+    /**
+     * @param string $file
+     * @return string
+     * @throws \Exception
+     */
     protected function renderJsonLogs($file)
     {
         $html = '';
-        if (!file_exists($file)) return 'No file';
+        if (!file_exists($file)) {
+            return 'No file';
+        }
         $file_handle = fopen($file, "r");
         while (!feof($file_handle)) {
             $line = fgets($file_handle);
-            if (!$line) continue;
+            if (!$line) {
+                continue;
+            }
             $data = json_decode($line);
             if (!empty($data->http) && !empty($data->logs)) {
-                $html .= $this->renderAllLogs($data->http, $data->logs);
+                $html .= $this->renderAllLogs(HttpData::init((array)$data->http), $data->logs);
             } else {
                 $html .= '<pre>' . $line . '</pre>';
             }
@@ -488,8 +523,9 @@ class FileViewer extends BaseViewer
     /**
      * Render line
      * @param HttpData $httpData
-     * @param LogData[]|int $logs
+     * @param LogData[] $logs
      * @return string
+     * @throws \Exception
      */
     public function renderAllLogs($httpData, $logs)
     {
@@ -499,65 +535,61 @@ class FileViewer extends BaseViewer
         //            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
         //        }
         $html = '<div class="bugs">';
-        if (!empty($httpData->is_console)) {
-            $html .= '<span class="bugs_uri">console: ' . $httpData->is_console . '</span> ';
-        }
-        else {
-            if (!empty($httpData->method))
+        if (!empty($httpData->shell)) {
+            $html .= '<span class="bugs_uri">console: ' . $httpData->shell . '</span> ';
+        } else {
+            if (!empty($httpData->method)) {
                 $html .= '<span class="bugs_uri">' . $httpData->method . '</span> ';
-            if (!empty($httpData->url))
+            }
+            if (!empty($httpData->url)) {
                 $html .= '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
-            elseif (!empty($httpData->host))
+            } elseif (!empty($httpData->host)) {
                 $html .= '<div class="bugs_uri">' . $httpData->host . '</div> ';
+            }
         }
 
-        if (!empty($httpData->ip_addr))
-            $html .= '<span class="bugs_ip">' . $httpData->ip_addr . '</span> ';
-        if (!empty($httpData->referrer))
+        if (!empty($httpData->ipAddr)) {
+            $html .= '<span class="bugs_ip">' . $httpData->ipAddr . '</span> ';
+        }
+        if (!empty($httpData->referrer)) {
             $html .= '<span class="bugs_ref">' . $httpData->referrer . '</span> ';
-        if (!empty($httpData->overMemory))
+        }
+        if (!empty($httpData->overMemory)) {
             $html .= '<span class="bugs_alert">Over memory limit</span> ';
+        }
 
         foreach ($logs as $logData) {
-            $html .= $this->renderItemLog($logData);
+            $html .= $this->renderItemLog(LogData::init((array)$logData));
         }
 
         return $html . '</div>';
     }
 
     /**
-     * @param LogData|int $logData
+     * @param LogData $logData
      * @return string
+     * @throws \Exception
      */
     public function renderItemLog($logData)
     {
-        require_once __DIR__ .'/file/head.php';
-        if (!is_object($logData)) return '+';
-        if (isset($logData->microtime)) {
-            $dt = explode('.', (string)$logData->microtime);
-        } else {
-            $dt = explode('.', (string)$logData->timestamp);
+        $view = $this;
+        require __DIR__ . '/file/head.php';
+        if (!is_object($logData)) {
+            return '+';
         }
+        $dt = explode('.', (string) $logData->microtime);
         $res = '<div class="bug_item bug_level_' . $logData->level . '">'
-            . '<span class="bug_time">' . date('H:i:s', $dt[0]) . '.'.$dt[1].'</span>'
+            . '<span class="bug_time">' . date('H:i:s', (int) $dt[0]) . '.' . (isset($dt[1]) ? $dt[1] : '') . '</span>'
             . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '[' . $logData->count . ']' : '') . '</span>';
         //(isset($logData->fields[PhpErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PhpErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
-        if ($logData->tags) {
-             array_walk($logData->tags, function (&$v) {
-                 if (!is_string($v)) $v = PhpErrorCatcher::dumpAsString($v);
-                 if (mb_strlen($v) > 32) {
-                    $v = mb_substr($v, 32) . '...';
-                 }
-                 $v = PhpErrorCatcher::_e($v);
-            });
-            $res .= '<span class="bug_tags">[' . implode(', ', $logData->tags) . ']</span>';
-        }
         if ($logData->fields) {
             $logData->fields = (array) $logData->fields;
-             array_walk($logData->fields, function (&$v) {
-                 if (!is_string($v)) $v = PhpErrorCatcher::dumpAsString($v);
+            array_walk($logData->fields, function (&$v) {
+                if (!is_string($v)) {
+                    $v = PhpErrorCatcher::dumpAsString($v);
+                }
                 if (mb_strlen($v) > 512) {
-                    $v = mb_substr($v, 512) . '...';
+                    $v = mb_substr($v, 0, 512) . '...';
                 }
             });
             $res .= '<span class="bug_fields">' . json_encode($logData->fields) . '</span>';
@@ -565,13 +597,13 @@ class FileViewer extends BaseViewer
         if ($logData->file) {
             //        $debug .= '<div class="bug_file"> File <a href="file:/' . $errfile . ':' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
             $fl = explode(':', $logData->file);
-            $res .= '<span class="bug_file"> File <a href="idea://open?url=file://' . $this->idePath . $fl[0] . '&line=' . $fl[1] . '">' . $logData->file . '</a></span>';
+            $res .= '<span class="bug_file"> File <a href="idea://open?url=file://' . $this->idePath . $fl[0] . '&line=' . (isset($fl[1]) ? $fl[1] : '') . '">' . $logData->file . '</a></span>';
         }
-        $res .= '<div class="bug_str">' . PhpErrorCatcher::_e($logData->message) . '</div>';
+        $res .= '<div class="bug_str">' . PhpErrorCatcher::esc($logData->message) . '</div>';
 
         if ($logData->trace) {
             $res .= '<div class="trace xsp"><div class="xsp-head" onclick="bugSp(this)">Trace</div><div class="xsp-body pre">'
-                . PhpErrorCatcher::_e($logData->trace)
+                . PhpErrorCatcher::esc($logData->trace)
                 . '</div></div>';
         }
 
@@ -579,4 +611,11 @@ class FileViewer extends BaseViewer
         return $res;
     }
 
+    /**
+     * @return array[]
+     */
+    public function getErrorListView()
+    {
+        return $this->errorListView;
+    }
 }

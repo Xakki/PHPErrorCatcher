@@ -8,13 +8,22 @@ class JsLogPlugin extends BasePlugin
 {
 
     /**
-     * If you want enable log-request, set this name
-     * @var null
+     * @var ?string
      */
     protected $catcherLogName = 'myCatcherLog';
+    /**
+     * @var bool
+     */
     protected $catcherLogFileSeparate = true;
+    /**
+     * @var string
+     */
     protected $level = PhpErrorCatcher::LEVEL_WARNING;
 
+    /**
+     * @param PhpErrorCatcher $owner
+     * @param array $config
+     */
     function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
@@ -31,7 +40,8 @@ class JsLogPlugin extends BasePlugin
     }
 
     /**
-     * Use catche.js for log error in javascript
+     * @param PhpErrorCatcher $owner
+     * @return void
      */
     public function initLogRequest(PhpErrorCatcher $owner)
     {
@@ -45,6 +55,7 @@ class JsLogPlugin extends BasePlugin
         $vars = [
             PhpErrorCatcher::FIELD_NO_TRICE => true,
             PhpErrorCatcher::FIELD_FILE => '',
+            PhpErrorCatcher::FIELD_TAG => 'js',
             'ver' => $_POST['v'],
             'url' => $_POST['u'],
             'referrer' => $_POST['r'],
@@ -54,7 +65,7 @@ class JsLogPlugin extends BasePlugin
         if (!empty($_POST['l'])) $vars[PhpErrorCatcher::FIELD_FILE] = $_POST['l'];
 
         $GLOBALS['skipRenderBackTrace'] = 1;
-        $owner->log($this->level, $errstr, ['js'], $vars);
+        $owner->log($this->level, $errstr, $vars);
 
     }
 

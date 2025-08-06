@@ -1,4 +1,8 @@
-
+<?php
+/**
+ * @var \Xakki\PhpErrorCatcher\viewer\FileViewer $view
+ */
+?>
 <style>
     .xsp.unfolded > .xsp-head::before {
         content: " - ";
@@ -97,7 +101,7 @@
     .bug_file {
     }
 
-    <?php  foreach ($this->_errorListView as $errno => $error): ?>
+    <?php  foreach ($view->getErrorListView() as $errno => $error) : ?>
     .bug_level_<?=$errno?> .bug_type {
         color: <?=$error['color']?>;
     }

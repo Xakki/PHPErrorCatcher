@@ -4,30 +4,22 @@ namespace Xakki\PhpErrorCatcher\dto;
 
 class HttpData extends AbstractData
 {
-    /** @var string|null */
+    /** @var string */
     public $ipAddr;
-    /** @var string|null */
+    /** @var string */
     public $host;
-    /** @var string|null */
+    /** @var string */
     public $method;
-    /** @var string|null */
+    /** @var string */
     public $url;
-    /** @var string|null */
+    /** @var string */
     public $referrer;
-    /** @var string|null */
+    /** @var string */
     public $scheme;
-    /** @var string|null */
+    /** @var string */
     public $userAgent;
     /** @var bool */
     public $overMemory = false;
     /** @var string */
     public $shell = '';
-
-    /**
-     * @return array
-     */
-    public function __toArray()
-    {
-        return get_object_vars($this);
-    }
 }

@@ -2,12 +2,13 @@
 
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\viewer\FileViewer;
+
 /**
  * @var string $file
- * @var \Xakki\PhpErrorCatcher\viewer\FileViewer $this
+ * @var \Xakki\PhpErrorCatcher\viewer\FileViewer $view
  */
 
-$home = $this->getHomeUrl('');
+$home = $view->getHomeUrl('');
 $tabs = [
     'BD' => '',
     'PROF' => '',
@@ -71,18 +72,18 @@ $tabs = [
 <ul class="nav nav-tabs">
     <li class="nav-item"><a class="nav-link<?=(!isset($tabs[$file]) ? ' active' : '')?>" href="<?=$home?>/">Логи</a></li>
 
-    <?php if (file_exists($this->_owner->getRawLogFile())): ?>
-        <li class="nav-item"><a class="text-danger nav-link<?=($file=='rawlog' ? ' active' : '')?>" href="<?=$home?>rawlog">Errors</a></li>
+    <?php if (file_exists($view->owner->getRawLogFile())) : ?>
+        <li class="nav-item"><a class="text-danger nav-link<?=($file == 'rawlog' ? ' active' : '')?>" href="<?=$home?>rawlog">Errors</a></li>
     <?php endif; ?>
 
-    <?php foreach ($this->_owner->getStorages() as $stClass => $st): ?>
-        <?php foreach ($st->getViewMenu() as $fName => $menuName): ?>
-            <li class="nav-item"><a class="text-danger nav-link<?=(($file=='storage' && $_GET['fname'] == $stClass.'/'.$fName)? ' active' : '')?>" href="<?=$home?>storage&fname=<?=$stClass.'/'.$fName?>"><?=$menuName?></a></li>
+    <?php foreach ($view->owner->getStorages() as $stClass => $st) : ?>
+        <?php foreach ($st->getViewMenu() as $fName => $menuName) : ?>
+            <li class="nav-item"><a class="text-danger nav-link<?=(($file == 'storage' && $_GET['fname'] == $stClass . '/' . $fName) ? ' active' : '')?>" href="<?=$home?>storage&fname=<?=$stClass . '/' . $fName?>"><?=$menuName?></a></li>
         <?php endforeach; ?>
     <?php endforeach; ?>
     <li class="nav-item"><a class="nav-link<?=($file == 'PHPINFO' ? ' active' : '')?>" href="<?=$home?>PHPINFO">PHPINFO</a></li>
     <li class="nav-item"><a class="nav-link<?=($file == 'Memcached' ? ' active' : '')?>" href="<?=$home?>Memcached">Memcached</a></li>
-    <?php foreach ($this->extraLinks as $name => $url): ?>
+    <?php foreach ($view->extraLinks as $name => $url) : ?>
         <li class="nav-item"><a class="nav-link" href="<?=$url?>" target="_blank"><?=$name?></a></li>
     <?php endforeach; ?>
     <li class="nav-item"><a class="nav-link">Core ver: <?=PhpErrorCatcher::VERSION?>. Viewer ver: <?=FileViewer::VERSION?></a></li>

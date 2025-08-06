@@ -29,6 +29,10 @@ class Tools
         return "\033[" . $colorId . "m" . $text . "\033[0m";
     }
 
+    /**
+     * @param mixed $mixed
+     * @return mixed
+     */
     public static function utf8ize($mixed)
     {
         if (is_array($mixed)) {
@@ -42,9 +46,9 @@ class Tools
     }
 
     /**
-     * @param $value
-     * @param $options
-     * @param $depth
+     * @param mixed $value
+     * @param int $options
+     * @param int $depth
      * @return string
      * @throws Exception
      */
@@ -70,12 +74,12 @@ class Tools
     }
 
     /**
-     * @param string $limitMemory
+     * @param string|int $limitMemory
      * @return int
      */
     public static function convertMemoryToByte($limitMemory)
     {
-        if ($limitMemory > 0) {
+        if (is_string($limitMemory)) {
             if (strpos($limitMemory, 'G')) {
                 $m = 1024 * 1024 * 1024;
             } elseif (strpos($limitMemory, 'M')) {
@@ -85,7 +89,7 @@ class Tools
             } else {
                 $m = 1;
             }
-            $limitMemory = (int)$limitMemory * $m;
+            $limitMemory = (int) $limitMemory * $m;
         }
         return $limitMemory;
     }
@@ -109,7 +113,7 @@ class Tools
 
     /**
      * @param mixed $var
-     * @param $limitString
+     * @param int $limitString
      * @param int $depth
      * @param bool $highlight
      * @return string
@@ -211,10 +215,10 @@ class Tools
     }
 
     /**
-     * @param mixed $arr
-     * @param $arrLen
-     * @param $strLen
-     * @return mixed
+     * @param array|mixed $arr
+     * @param int $arrLen
+     * @param int $strLen
+     * @return array|mixed
      */
     public static function renderDebugArray($arr, $arrLen = 6, $strLen = 256)
     {
@@ -261,13 +265,13 @@ class Tools
 
     /**
      * @param string $str
-     * @param array $exclude
+     * @param string[] $exclude
      * @return bool
      */
     public static function containExclude($str, array $exclude)
     {
         foreach ($exclude as $item) {
-            if (str_contains($str, $item)) {
+            if (strpos($str, $item) !== false) {
                 return true;
             }
         }
@@ -276,7 +280,7 @@ class Tools
 
     /**
      * @param array $traceItem
-     * @param array $exclude
+     * @param string[] $exclude
      * @return bool
      */
     public static function isTraceHasExclude(array $traceItem, array $exclude)
@@ -287,7 +291,7 @@ class Tools
 
     /**
      * @param array $trace
-     * @param array $lineExclude
+     * @param string[] $lineExclude
      * @return string
      */
     public static function getFileLineByTrace(array $trace, array $lineExclude = [])
@@ -306,7 +310,7 @@ class Tools
     }
 
     /**
-     * @param string $tag
+     * @param mixed $tag
      * @return string
      */
     public static function prepareTag($tag)
@@ -332,7 +336,7 @@ class Tools
 
     /**
      * @param array $fields
-     * @param array $excludeKeys
+     * @param string[] $excludeKeys
      * @return array
      */
     public static function prepareFields(array &$fields, array $excludeKeys)
@@ -352,7 +356,7 @@ class Tools
     }
 
     /**
-     * @param $message
+     * @param mixed $message
      * @param int $limitString
      * @return string
      */
@@ -366,7 +370,6 @@ class Tools
     }
 
     /**
-     * Экранирование
      * @param mixed $value
      * @return string
      * @throws Exception
@@ -381,7 +384,6 @@ class Tools
 
 
     /**
-     * recurse del dir
      * @param string $dir
      * @return bool
      */

@@ -3,7 +3,7 @@
 namespace Xakki\PhpErrorCatcher\storage;
 
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
-use Xakki\PhpErrorCatcher\LogData;
+use Xakki\PhpErrorCatcher\dto\LogData;
 
 /**
  * Class SyslogStorage
@@ -17,22 +17,34 @@ use Xakki\PhpErrorCatcher\LogData;
  */
 class SyslogStorage extends BaseStorage
 {
-    /* Config */
+    /** @var int */
     protected $syslogFacility = LOG_LOCAL7;
+    /** @var int */
     protected $syslogFlags = LOG_PID;
+    /** @var string */
     protected $syslogPrefix = 'json';
+    /** @var false|resource|\Socket */
     protected $sock;
+    /** @var string */
     protected $remoteIp = '127.0.0.1';
+    /** @var int */
     protected $remotePort = 451;
+    /**
+     * @var false|int
+     */
     protected $pid;
+    /** @var string */
     protected $hostname;
+    /** @var int */
     protected $logSize = 1400;
 
-
-    function __construct(PhpErrorCatcher $owner, $config = [])
+    /**
+     * @param PhpErrorCatcher $owner
+     * @param array<string, mixed> $config
+     */
+    public function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
-//        openlog($this->syslogPrefix, $this->syslogFlags, $this->syslogFacility);
         $this->sock = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 
         $this->pid = getmypid();
@@ -45,13 +57,22 @@ class SyslogStorage extends BaseStorage
         }
     }
 
-    function __destruct()
+    /**
+     * @return void
+     */
+    public function __destruct()
     {
         parent::__destruct();
         socket_close($this->sock);
     }
 
-    function write(LogData $logData) {
+    /**
+     * @param LogData $logData
+     * @return void
+     * @throws \Exception
+     */
+    public function write(LogData $logData)
+    {
 
         $log = [
             'ver' => PhpErrorCatcher::VERSION,
@@ -60,13 +81,14 @@ class SyslogStorage extends BaseStorage
             'level_php' => $logData->levelInt,
             'extra' => $this->getDataHttp(),
             'context' => $logData->fields,
-            'tags' => implode(',', $logData->tags),
         ];
         $log['context']['trace'] = $logData->trace;
         $log['context']['file'] = $logData->file;
         $log['context']['logType'] = $logData->type;
-        $date = \DateTime::createFromFormat('U.u', $logData->microtime);
-        $log['context']['timestamp'] = $date->format('Y-m-d H:i:s.u');
+        $date = \DateTime::createFromFormat('U.u', (string)$logData->microtime);
+        if ($date) {
+            $log['context']['timestamp'] = $date->format('Y-m-d H:i:s.u');
+        }
 
         $log = $this->trimLog($log);
         //fwrite(STDOUT, $log);
@@ -83,6 +105,7 @@ class SyslogStorage extends BaseStorage
     /**
      * @param array<string, mixed> $recordData
      * @return string
+     * @throws \Exception
      */
     protected function trimLog(array $recordData)
     {
@@ -123,7 +146,9 @@ class SyslogStorage extends BaseStorage
             }
             $len = self::getLen($recordData);
             $limit = $limit * 0.7;
-            if ($i > 4) break;
+            if ($i > 4) {
+                break;
+            }
         }
 
         return PhpErrorCatcher::safe_json_encode($recordData);
@@ -144,6 +169,7 @@ class SyslogStorage extends BaseStorage
     /**
      * @param mixed $v
      * @return int
+     * @throws \Exception
      */
     protected function getLen($v)
     {

@@ -15,14 +15,12 @@
     <issueHandlers>
         <LessSpecificReturnType errorLevel="info" />
 
-        <!-- level 3 issues - slightly lazy code writing, but provably low false-negatives -->
-
-        <DeprecatedMethod errorLevel="error" />
-        <DeprecatedProperty errorLevel="error" />
-        <DeprecatedClass errorLevel="error" />
-        <DeprecatedConstant errorLevel="error" />
-        <DeprecatedInterface errorLevel="error" />
-        <DeprecatedTrait errorLevel="error" />
+        <DeprecatedMethod errorLevel="info" />
+        <DeprecatedProperty errorLevel="info" />
+        <DeprecatedClass errorLevel="info" />
+        <DeprecatedConstant errorLevel="info" />
+        <DeprecatedInterface errorLevel="info" />
+        <DeprecatedTrait errorLevel="info" />
 
         <MissingClosureReturnType errorLevel="info" />
         <MissingReturnType errorLevel="info" />

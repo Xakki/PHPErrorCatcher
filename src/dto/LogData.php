@@ -12,18 +12,18 @@ class LogData extends AbstractData
     public $message;
     /** @var string */
     public $level;
+    /** @var int */
+    public $levelInt;
     /** @var string */
     public $type;
     /** @var string|null */
     public $trace = null;
     /** @var string */
     public $file;
-    /** @var array */
-    public $tags = [];
-    /** @var array */
+    /** @var array<string, mixed> */
     public $fields = [];
     /** @var float */
-    public $timestamp;
+    public $microtime;
     /** @var int */
     public $count = 1;
 
@@ -33,6 +33,6 @@ class LogData extends AbstractData
      */
     public function __toString()
     {
-        return Tools::safeJsonEncode(get_object_vars($this), JSON_UNESCAPED_UNICODE);
+        return Tools::safeJsonEncode($this->__toArray(), JSON_UNESCAPED_UNICODE);
     }
 }
