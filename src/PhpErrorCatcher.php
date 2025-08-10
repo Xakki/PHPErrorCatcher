@@ -622,6 +622,19 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         return false;
     }
 
+    public static function isAjax()
+    {
+        if (!empty($_SERVER['is_json']))
+            return true;
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
+            return true;
+        }
+        if (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * @param LogData $logData
      */
@@ -629,14 +642,14 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
     {
         if ($this->debugMode && !empty($_SERVER['argv'])) {
             $this->consolePrint($logData);
-        } elseif ($this->debugMode && empty($_SERVER['is_json'])) {
+        } elseif ($this->debugMode && !self::isAjax()) {
             $this->htmlPrint($logData);
         }
 
         $key = $logData->logKey;
 
         if ($this->ifStopRules($logData)) {
-            // TODO: option & cli print
+// TODO: option & cli print
 //                    echo PHP_EOL;
 //                    print_r($logData);
 //                    echo PHP_EOL;
@@ -713,9 +726,9 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         }
         $output .= PHP_EOL . "\t" . str_replace(PHP_EOL, "\n\t", self::cliColor($logData->message, self::COLOR_GRAY2)) . PHP_EOL;
 
-        if (isset($_SERVER['TERM'])) {
+        if (isset($_SERVER['TERM']) && is_resource(\STDERR)) {
             fwrite(\STDERR, $output); // Ошибки в консоли можно залогировать толкьо так `&2 >>`
-        } else {
+        } elseif (is_resource(\STDOUT)) {
             // Для кронов, чтобы все логи по умолчанию выводились дефолтно черезе `>>`
             fwrite(\STDOUT, $output);
         }

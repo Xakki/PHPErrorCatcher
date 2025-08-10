@@ -1,14 +1,14 @@
 {
   "name": "phperrorcatcher",
   "description": "Logger all error in file for PHP",
-  "version": "0.4.11",
+  "version": "0.5.1",
   "keywords": [
     "php",
     "error",
     "loger"
   ],
-  "homepage": "http://xakki.ru",
-  "author": "Xakki (https://github.com/xakki)",
+  "homepage": "https://github.com/xakki",
+  "author": "Xakki",
   "contributors": [
     "Xakki"
   ],
@@ -20,9 +20,6 @@
     "url": "https://github.com/xakki/phperrorcatcher/issues"
   },
   "license": "LGPL-2.1",
-  "require-dev": {
-    "phpmailer/phpmailer": "^6.0"
-  },
   "files": [
     "src/*.php",
     ".gitignore",

@@ -1,7 +1,7 @@
 SHELL = /bin/bash
 ### https://makefiletutorial.com/
 
-docker := docker run -it -v $(PWD):/app phperrorcatcher56
+docker := docker run -it --rm -v $(PWD):/app phperrorcatcher56
 composer := $(docker) composer
 
 docker-build:

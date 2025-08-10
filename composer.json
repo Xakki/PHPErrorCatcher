@@ -5,11 +5,11 @@
   "type": "library",
   "minimum-stability": "dev",
   "prefer-stable": true,
-  "license": "LGPL-2.1",
+  "license": "MIT",
   "authors": [
     {
-      "name": "Xakki",
-      "email": "xakki@ya.ru"
+      "name": "xakki",
+      "email": "dev@xakki.ru"
     }
   ],
   "support": {
