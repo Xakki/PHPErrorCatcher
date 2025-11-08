@@ -24,7 +24,8 @@ class PhpErrorCatcher implements LoggerInterface
         LEVEL_NOTICE = 'notice',
         LEVEL_WARNING = 'warning',
         LEVEL_ERROR = 'error',
-        LEVEL_CRITICAL = 'critical';
+        LEVEL_CRITICAL = 'critical',
+        LEVEL_ALERT = 'alert';
 
     public const TYPE_LOGGER = 'logger',
         TYPE_TRIGGER = 'trigger',
@@ -67,6 +68,7 @@ class PhpErrorCatcher implements LoggerInterface
     ];
 
     public const CLI_LEVEL_COLOR = [
+        self::LEVEL_ALERT => Tools::COLOR_RED,
         self::LEVEL_CRITICAL => Tools::COLOR_RED,
         self::LEVEL_ERROR => Tools::COLOR_RED,
         self::LEVEL_WARNING => Tools::COLOR_YELLOW,
@@ -74,6 +76,18 @@ class PhpErrorCatcher implements LoggerInterface
         self::LEVEL_INFO => Tools::COLOR_GREEN,
         self::LEVEL_TIME => Tools::COLOR_LIGHT_BLUE,
         self::LEVEL_DEBUG => Tools::COLOR_BLUE2,
+    ];
+
+    /** @var string[] */
+    protected static $logLevel = [
+        LOG_EMERG => self::LEVEL_ALERT,
+        LOG_ALERT => self::LEVEL_ALERT,
+        LOG_CRIT => self::LEVEL_CRITICAL,
+        LOG_ERR => self::LEVEL_ERROR,
+        LOG_WARNING => self::LEVEL_WARNING,
+        LOG_NOTICE => self::LEVEL_NOTICE,
+        LOG_INFO => self::LEVEL_INFO,
+        LOG_DEBUG => self::LEVEL_DEBUG,
     ];
 
     /************************************/
@@ -103,6 +117,7 @@ class PhpErrorCatcher implements LoggerInterface
      * @var array<string, int>
      */
     protected static array $logTraceByLevel = [
+        self::LEVEL_ALERT => 10, // trace deep level
         self::LEVEL_CRITICAL => 10, // trace deep level
         self::LEVEL_ERROR => 8,
         self::LEVEL_WARNING => 16,
@@ -126,6 +141,7 @@ class PhpErrorCatcher implements LoggerInterface
      * @var array<array{level:string}>
      */
     protected static array $printHttpRules = [
+        ['level' => self::LEVEL_ALERT],
         ['level' => self::LEVEL_CRITICAL],
     ];
 
@@ -133,6 +149,7 @@ class PhpErrorCatcher implements LoggerInterface
      * @var array<array{level:string}>
      */
     protected static array $printConsoleRules = [
+        ['level' => self::LEVEL_ALERT],
         ['level' => self::LEVEL_CRITICAL],
         ['level' => self::LEVEL_ERROR],
     ];
@@ -147,6 +164,8 @@ class PhpErrorCatcher implements LoggerInterface
 
     protected int $count = 0;
     protected int $errCount = 0;
+    /** @var array<int, int>  */
+    protected $countByLevel = [];
     protected float $timeStart = 0;
     protected int $timeEnd = 0;
     protected string $sessionKey = '';
@@ -183,6 +202,7 @@ class PhpErrorCatcher implements LoggerInterface
      * @var array<string, int>
      */
     protected static array $errorLevel = [
+        self::LEVEL_ALERT => 1,
         self::LEVEL_CRITICAL => 1,
         self::LEVEL_ERROR => 1,
         self::LEVEL_WARNING => 1,
@@ -400,7 +420,10 @@ class PhpErrorCatcher implements LoggerInterface
 
     public function needSaveLog(): bool
     {
-        return !$this->successSaveLog && $this->hasLog() && (!self::$saveLogIfHasError || $this->errCount);
+        if ($this->debugMode) {
+            return true;
+        }
+        return $this->getCountByLevelAndLess($this->saveLogIfHasError) > 0;
     }
 
     public function handleException(Throwable $e): void
@@ -575,6 +598,12 @@ class PhpErrorCatcher implements LoggerInterface
         if (isset(self::$errorLevel[$level])) {
             $this->errCount++;
         }
+        if (isset(self::$errorLevel[$level])) {
+            if (!isset($this->countByLevel[$level])) {
+                $this->countByLevel[$level] = 0;
+            }
+            $this->countByLevel[$level]++;
+        }
         $this->count++;
 
         [$tags, $fields] = $this->collectTagsAndFields($context);
@@ -593,7 +622,17 @@ class PhpErrorCatcher implements LoggerInterface
         $logData->levelInt = (int) array_search($logData->level, self::$triggerLevel);
         $logData->type = $fields[self::FIELD_LOG_TYPE];
 
-        if (isset(self::$logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE])) {
+        if (isset($context[self::FIELD_TRICE])) {
+            if (is_string($context[self::FIELD_TRICE])) {
+                $logData->trace = $context[self::FIELD_TRICE];
+            }
+            elseif (is_array($context[self::FIELD_TRICE])) {
+                $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRICE]);
+            }
+            else {
+                $logData->trace = json_encode($context[self::FIELD_TRICE]);
+            }
+        } elseif (isset(self::$logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE])) {
             $logData->trace = $this->renderDebugTrace(
                 $fields[self::FIELD_TRICE] ?? null,
                 0,
@@ -610,7 +649,7 @@ class PhpErrorCatcher implements LoggerInterface
         $logData->tags = Tools::prepareTags($tags);
         $logData->fields = Tools::prepareFields($fields, self::LOG_FIELDS);
         $logData->timestamp = microtime(true);
-        $logData->logKey = 'phpeErCh_' . $this->getSessionKey() . '_' . md5($logData->message . $logData->file);
+        $logData->logKey = 'phpErr:' . $this->getSessionKey() . ':' . md5($logData->message . $logData->file);
         return $logData;
     }
 
@@ -663,7 +702,7 @@ class PhpErrorCatcher implements LoggerInterface
         if ($logData->level === self::LEVEL_DEBUG && !static::$debugMode) {
             return;
         }
-        if (empty($_SERVER['argv'])) {
+        if (empty($_SERVER['argv']) && !defined('CLI')) {
             if ($this->checkRules($logData, static::$printHttpRules))
                 $this->printHttp($logData);
         } else {
@@ -684,10 +723,12 @@ class PhpErrorCatcher implements LoggerInterface
         if ($logData->tags) {
             $output .= Tools::cliColor(' [' . implode(', ', $logData->tags) . ']', Tools::COLOR_GRAY);
         }
-        if (isset(self::$errorLevel[$logData->level])) {
-            if ($logData->fields) {
-                $output .= ' ' . Tools::cliColor(Tools::safeJsonEncode($logData->fields), Tools::COLOR_GRAY);
-            }
+
+        if ($logData->fields) {
+            $output .= ' ' . Tools::cliColor(Tools::safeJsonEncode($logData->fields), Tools::COLOR_GRAY);
+        }
+
+        if ($logData->levelInt <= LOG_NOTICE) {
             if ($logData->file) {
                 $output .= PHP_EOL . "\t" . $logData->file;
             }
@@ -791,6 +832,19 @@ class PhpErrorCatcher implements LoggerInterface
     public static function startCatchLog(): void
     {
         self::$userCatchLogFlag = true;
+    }
+
+    /**
+     * @return ?string
+     */
+    public function getHighLevelLogs()
+    {
+        for ($i = LOG_EMERG; $i <= LOG_DEBUG; $i++) {
+            if (isset($this->countByLevel[self::$logLevel[$i]])) {
+                return self::$logLevel[$i];
+            }
+        }
+        return null;
     }
 
     /***************************************************/
@@ -932,7 +986,7 @@ class PhpErrorCatcher implements LoggerInterface
     public function alert(Stringable|string $message, array $context = []): void
     {
         $context[] = 'alert';
-        $this->log(self::LEVEL_CRITICAL, $message, $context);
+        $this->log(self::LEVEL_ALERT, $message, $context);
     }
 
     /**

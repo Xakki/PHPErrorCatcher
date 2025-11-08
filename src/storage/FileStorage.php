@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xakki\PhpErrorCatcher\storage;
 
 use Generator;
@@ -37,12 +39,11 @@ class FileStorage extends BaseStorage
     function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
-        $this->tmpFile = $this->getFullLogDir() . 'tmp_' . microtime(true) . '_' . (isset($serverData['REMOTE_ADDR']) ? $serverData['REMOTE_ADDR'] : '');
+        $this->tmpFile = $this->getFullLogDir().  ':' .uniqid('tmp_', true) . rand(1,1000000) . ':' . (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '') ;
     }
 
     function __destruct()
     {
-        parent::__destruct();
         if ($this->owner->needSaveLog()) {
             $this->finishSave();
         }
@@ -53,7 +54,8 @@ class FileStorage extends BaseStorage
     }
 
 
-    function write(LogData $logData) {
+    function write(LogData $logData): void
+    {
         if (!$this->enableLogging) return;
         if ($this->maxLevelInt && $logData->levelInt > $this->maxLevelInt) {
             return;
@@ -73,15 +75,12 @@ class FileStorage extends BaseStorage
         $this->isEmptyTmpFile = false;
     }
 
-    private function getFullLogDir()
+    private function getFullLogDir(): string
     {
         return rtrim($this->logPath, '/') . '/'.trim($this->logDir, '/') . '/';
     }
 
-    /**
-     * @return void
-     */
-    private function finishSave()
+    private function finishSave(): void
     {
         if (!file_exists($this->tmpFile)) return;
         $lastSlash = strrpos($this->tplPath, '/');
@@ -131,10 +130,13 @@ class FileStorage extends BaseStorage
         if ($flagNew) chmod($fileName, 0666);
     }
 
-    protected function toString($data)
+    protected function toString(mixed $data): string
     {
         return str_replace(PHP_EOL, '\\n', \Xakki\PhpErrorCatcher\Tools::safeJsonEncode($data, JSON_UNESCAPED_UNICODE));
     }
 
-
+    public function checkIsBackUp(string $file): bool
+    {
+        return str_contains($file, $this->getLogPath() . $this->getBackUpDir());
+    }
 }

@@ -31,6 +31,11 @@ class FileViewer extends BaseViewer
      * @var mixed[]
      */
     protected array $errorListView = [
+        PhpErrorCatcher::LEVEL_ALERT => [
+            'type' => '[Alert]',
+            'color' => 'red',
+            'debug' => 1,
+        ],
         PhpErrorCatcher::LEVEL_CRITICAL => [
             'type' => '[Critical]',
             'color' => 'red',
@@ -153,15 +158,39 @@ class FileViewer extends BaseViewer
                         $this->renderViewCreateBackUp($file);
                         return;
                     }
+                    if (isset($_GET['only'])) {
+                        $size = filesize($file);
+                        $handle = fopen($file, 'rb');
 
-                    if (!isset($_GET['only'])) {
-                        $this->renderViewBreadCrumb($url);
+                        ini_set('max_execution_time', 0);
+                        // Set headers to force download
+                        header('Content-Type: application/octet-stream');
+                        header('Content-Disposition: attachment; filename="' . basename($file) . '"');
+                        header('Content-Length: ' . $size);
+                        // Clean the output buffer
+                        ob_clean();
+                        flush();
 
-                        if (!$this->fileStorage->checkIsBackUp($file)) {
-                            echo ' [<a href="' . $_SERVER['REQUEST_URI'] . '&only=1&download=1" class="linkSource">Download</a> <a href="' . $_SERVER['REQUEST_URI'] . '&only=1" class="linkSource">Source</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=do">Бекап</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=del">Удалить</a>]';
+                        // Read and output the file in chunks
+                        while (!feof($handle)) {
+                            echo fread($handle, 65536); // 64KB chunks
+                            ob_flush();  // Flush the output buffer
+                            flush();     // Ensure that data is sent to the browser
                         }
-                        echo '</h3>';
+
+                        // Close the file handle
+                        fclose($handle);
+                        exit;
                     }
+
+
+                    $this->renderViewBreadCrumb($url);
+
+                    if (!$this->fileStorage->checkIsBackUp($file)) {
+                        echo ' [<a href="' . $_SERVER['REQUEST_URI'] . '&only=1&download=1" class="linkSource">Download</a> <a href="' . $_SERVER['REQUEST_URI'] . '&only=1" class="linkSource">Source</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=do">Бекап</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=del">Удалить</a>]';
+                    }
+                    echo '</h3>';
+
                     $this->renderFileContent($file);
                 }
             } else {
@@ -249,7 +278,8 @@ class FileViewer extends BaseViewer
                     '<a href="' . $fileUrl . '" style="' . (is_dir($filePath) ? 'font-weight:bold;' : '') . '">' . $path . '/' . $entry . '</a> ',
                     $size,
                     $create,
-                    ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Source</a>' : '') . (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
+                    ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Download</a>' : '') .
+                    (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
                     $createTime,
                 ];
                 // glyphicon glyphicon-hdd
