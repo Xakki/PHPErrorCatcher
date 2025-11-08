@@ -640,7 +640,7 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
      */
     protected function add(LogData $logData)
     {
-        if ($this->debugMode && !empty($_SERVER['argv'])) {
+        if ($this->debugMode && (!empty($_SERVER['argv']) || defined('CLI'))) {
             $this->consolePrint($logData);
         } elseif ($this->debugMode && !self::isAjax()) {
             $this->htmlPrint($logData);
@@ -716,10 +716,11 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         $output = PHP_EOL . $dt
             . ' ' . self::cliColor($logData->level, self::CLI_LEVEL_COLOR[$logData->level]);
 
-        if (isset(self::$_errorLevel[$logData->level])) {
-            if ($logData->fields) {
-                $output .= ' ' . self::cliColor(json_encode($logData->fields), self::COLOR_GRAY);
-            }
+        if ($logData->fields) {
+            $output .= ' ' . self::cliColor(json_encode($logData->fields), self::COLOR_GRAY);
+        }
+
+        if ($logData->levelInt <= LOG_NOTICE) {
             if ($logData->file) {
                 $output .= PHP_EOL . "\t" . $logData->file;
             }
@@ -1475,8 +1476,16 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
             $context['logCookieKey'] = $_COOKIE[$this->logCookieKey];
         }
 
-        if (isset($context[self::FIELD_TRICE]) && is_string($context[self::FIELD_TRICE])) {
-            $logData->trace = $context[self::FIELD_TRICE];
+        if (isset($context[self::FIELD_TRICE])) {
+            if (is_string($context[self::FIELD_TRICE])) {
+                $logData->trace = $context[self::FIELD_TRICE];
+            }
+            elseif (is_array($context[self::FIELD_TRICE])) {
+                $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRICE]);
+            }
+            else {
+                $logData->trace = json_encode($context[self::FIELD_TRICE]);
+            }
         } elseif (isset($this->logTraceByLevel[$level]) && empty($context[self::FIELD_NO_TRICE])) {
             $logData->trace = $this->renderDebugTrace(
                 isset($context[self::FIELD_TRICE]) ? $context[self::FIELD_TRICE] : null,
