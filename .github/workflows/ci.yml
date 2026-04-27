@@ -60,12 +60,7 @@ jobs:
           php-version: '7.4'
           extensions: mbstring, json
           coverage: none
-          tools: composer:v2
-
-      - name: Install dependencies
-        run: |
-          composer remove --dev --no-update vimeo/psalm || true
-          composer update --no-progress --no-interaction --prefer-dist
+          tools: composer:v2, cs2pr, phpcs:^3.13
 
       - name: Run phpcs
-        run: composer cs-check
+        run: phpcs -ps --standard=phpcs.xml
