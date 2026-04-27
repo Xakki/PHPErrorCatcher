@@ -41,7 +41,9 @@ jobs:
           restore-keys: composer-${{ matrix.php }}-
 
       - name: Install dependencies
-        run: composer update --no-progress --no-interaction --prefer-dist
+        run: |
+          composer remove --dev --no-update vimeo/psalm || true
+          composer update --no-progress --no-interaction --prefer-dist --ignore-platform-reqs
 
       - name: Run PHPUnit
         run: vendor/bin/phpunit --colors=always
@@ -61,7 +63,9 @@ jobs:
           tools: composer:v2
 
       - name: Install dependencies
-        run: composer update --no-progress --no-interaction --prefer-dist
+        run: |
+          composer remove --dev --no-update vimeo/psalm || true
+          composer update --no-progress --no-interaction --prefer-dist
 
       - name: Run phpcs
         run: composer cs-check
