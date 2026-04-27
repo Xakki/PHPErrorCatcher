@@ -60,7 +60,7 @@ jobs:
           php-version: '7.4'
           extensions: mbstring, json
           coverage: none
-          tools: composer:v2, cs2pr, phpcs:^3.13
+          tools: composer:v2, phpcs
 
       - name: Run phpcs
         id: phpcs
