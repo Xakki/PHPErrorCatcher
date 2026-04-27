@@ -24,3 +24,6 @@ cs-check:
 
 psalm:
 	$(docker) vendor/bin/psalm
+
+test:
+	$(docker) vendor/bin/phpunit

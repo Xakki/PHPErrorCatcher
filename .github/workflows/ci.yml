@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [master, master56]
+  pull_request:
+    branches: [master, master56]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: PHPUnit (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['5.6']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, json, curl, pdo, sockets
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ matrix.php }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ matrix.php }}-
+
+      - name: Install dependencies
+        run: |
+          composer remove --dev --no-update vimeo/psalm || true
+          composer update --no-progress --no-interaction --prefer-dist --ignore-platform-reqs
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit --colors=always
+
+  cs:
+    name: Code style (phpcs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '5.6'
+          extensions: mbstring, json
+          coverage: none
+          tools: composer:v2, phpcs:3.7.2
+
+      - name: Run phpcs
+        id: phpcs
+        run: |
+          phpcs -ps --standard=phpcs.xml --report=full --report-file=phpcs-report.txt
+        continue-on-error: true
+
+      - name: Upload phpcs report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpcs-report
+          path: phpcs-report.txt
+          if-no-files-found: ignore
+
+      - name: Fail if phpcs reported violations
+        if: steps.phpcs.outcome == 'failure'
+        run: exit 1

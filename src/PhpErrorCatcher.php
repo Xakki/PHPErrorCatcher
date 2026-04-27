@@ -624,8 +624,9 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
 
     public static function isAjax()
     {
-        if (!empty($_SERVER['is_json']))
+        if (!empty($_SERVER['is_json'])) {
             return true;
+        }
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] == 'XMLHttpRequest') {
             return true;
         }
@@ -1402,7 +1403,7 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         if (!$this->debugMode && $level === self::LEVEL_DEBUG) {
             return;
         }
-        foreach($context as $k => &$v) {
+        foreach ($context as $k => &$v) {
             if (!is_string($k)) {
                 $context[self::FIELD_TAG] = $v;
                 unset($context[$k]);
@@ -1479,11 +1480,9 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         if (isset($context[self::FIELD_TRICE])) {
             if (is_string($context[self::FIELD_TRICE])) {
                 $logData->trace = $context[self::FIELD_TRICE];
-            }
-            elseif (is_array($context[self::FIELD_TRICE])) {
+            } elseif (is_array($context[self::FIELD_TRICE])) {
                 $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRICE]);
-            }
-            else {
+            } else {
                 $logData->trace = json_encode($context[self::FIELD_TRICE]);
             }
         } elseif (isset($this->logTraceByLevel[$level]) && empty($context[self::FIELD_NO_TRICE])) {

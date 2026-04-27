@@ -51,7 +51,7 @@ class FileStorage extends BaseStorage
     public function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
-        $this->tmpFile = $this->getFullLogDir().  '_' .uniqid('tmp_', true) . rand(1,1000000) . '_' . (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '') ;
+        $this->tmpFile = $this->getFullLogDir() . '_' . uniqid('tmp_', true) . rand(1, 1000000) . '_' . (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
     }
 
     /**
@@ -108,8 +108,6 @@ class FileStorage extends BaseStorage
             $this->isEmptyTmpFile = false;
             $this->lastTimeSave = time();
         }
-
-
     }
 
     /**
@@ -175,7 +173,9 @@ class FileStorage extends BaseStorage
         $handle = fopen($this->tmpFile, "r");
         if ($handle) {
             while (($logData = fgets($handle)) !== false) {
-                if (!$logData) continue;
+                if (!$logData) {
+                    continue;
+                }
                 /** @var LogData $logData */
                 $logData = json_decode($logData);
                 if (isset($this->logKeys[$logData->logKey]) && $this->logKeys[$logData->logKey] > 1) {

@@ -5,3 +5,5 @@ composer.phar
 composer.lock
 /vendor/
 .phpcs-cache
+.phpunit.result.cache
+/.claude/
