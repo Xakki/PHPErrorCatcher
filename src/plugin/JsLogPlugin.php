@@ -53,7 +53,7 @@ class JsLogPlugin extends BasePlugin
         $size = mb_strlen(serialize((array)$errstr), '8bit');
         if ($size > 1000) $errstr = mb_substr($errstr, 0, 1000) . '...(' . $size . 'b)...';
         $vars = [
-            PhpErrorCatcher::FIELD_NO_TRICE => true,
+            PhpErrorCatcher::FIELD_NO_TRACE => true,
             PhpErrorCatcher::FIELD_FILE => '',
             PhpErrorCatcher::FIELD_TAG => 'js',
             'ver' => $_POST['v'],
@@ -61,7 +61,7 @@ class JsLogPlugin extends BasePlugin
             'referrer' => $_POST['r'],
             'userAgent' => isset($_POST['ua']) ? $_POST['ua'] : '',
         ];
-        if (!empty($_POST['s'])) $vars[PhpErrorCatcher::FIELD_TRICE] = str_replace('||', PHP_EOL, $_POST['s']);
+        if (!empty($_POST['s'])) $vars[PhpErrorCatcher::FIELD_TRACE] = str_replace('||', PHP_EOL, $_POST['s']);
         if (!empty($_POST['l'])) $vars[PhpErrorCatcher::FIELD_FILE] = $_POST['l'];
 
         $GLOBALS['skipRenderBackTrace'] = 1;

@@ -26,8 +26,8 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
     const FIELD_LOG_TYPE = 'log_type',
         FIELD_FILE = 'file',
         FIELD_TAG = 'tag',
-        FIELD_TRICE = 'trice',
-        FIELD_NO_TRICE = 'trice_no_fake',
+        FIELD_TRACE = 'trace',
+        FIELD_NO_TRACE = 'trace_no_fake',
         FIELD_ERR_CODE = 'error_code';
 
     /** @var string[] */
@@ -476,7 +476,7 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
             self::FIELD_FILE => $this->getRelativeFilePath($errfile) . ':' . $errline,
             self::FIELD_LOG_TYPE => self::TYPE_TRIGGER,
             self::FIELD_ERR_CODE => $errno,
-            self::FIELD_TRICE => array_slice(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $this->limitTrace + 1), 1),
+            self::FIELD_TRACE => array_slice(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, $this->limitTrace + 1), 1),
         ];
 
         $this->log(self::$triggerLevel[$errno], $errstr, $fields);
@@ -775,7 +775,7 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         }
 
         if (method_exists($object, 'getTrace')) {
-            $fields[self::FIELD_TRICE] = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
+            $fields[self::FIELD_TRACE] = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
         }
 
         return [$mess, $fields];
@@ -1477,28 +1477,28 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
             $context['logCookieKey'] = $_COOKIE[$this->logCookieKey];
         }
 
-        if (isset($context[self::FIELD_TRICE])) {
-            if (is_string($context[self::FIELD_TRICE])) {
-                $logData->trace = $context[self::FIELD_TRICE];
-            } elseif (is_array($context[self::FIELD_TRICE])) {
-                $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRICE]);
+        if (isset($context[self::FIELD_TRACE])) {
+            if (is_string($context[self::FIELD_TRACE])) {
+                $logData->trace = $context[self::FIELD_TRACE];
+            } elseif (is_array($context[self::FIELD_TRACE])) {
+                $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRACE]);
             } else {
-                $logData->trace = json_encode($context[self::FIELD_TRICE]);
+                $logData->trace = json_encode($context[self::FIELD_TRACE]);
             }
-        } elseif (isset($this->logTraceByLevel[$level]) && empty($context[self::FIELD_NO_TRICE])) {
+        } elseif (isset($this->logTraceByLevel[$level]) && empty($context[self::FIELD_NO_TRACE])) {
             $logData->trace = $this->renderDebugTrace(
-                isset($context[self::FIELD_TRICE]) ? $context[self::FIELD_TRICE] : null,
+                isset($context[self::FIELD_TRACE]) ? $context[self::FIELD_TRACE] : null,
                 0,
                 $this->logTraceByLevel[$level]
             );
         }
 
-        if (isset($context[self::FIELD_NO_TRICE])) {
-            unset($context[self::FIELD_NO_TRICE]);
+        if (isset($context[self::FIELD_NO_TRACE])) {
+            unset($context[self::FIELD_NO_TRACE]);
         }
 
-        if (isset($context[self::FIELD_TRICE])) {
-            unset($context[self::FIELD_TRICE]);
+        if (isset($context[self::FIELD_TRACE])) {
+            unset($context[self::FIELD_TRACE]);
         }
 
         if (isset($context[self::FIELD_FILE])) {
