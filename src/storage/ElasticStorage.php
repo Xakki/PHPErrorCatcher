@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
@@ -18,7 +19,6 @@ class ElasticStorage extends BaseStorage
     public function __destruct()
     {
         if ($this->owner->needSaveLog()) {
-
             if ($this->putData($this->owner->getDataLogsGenerator(), $_SERVER)) {
                 $this->owner->successSaveLog();
             }
@@ -36,7 +36,7 @@ class ElasticStorage extends BaseStorage
     }
 
     /**
-     * @param Generator|LogData[] $logsData
+     * @param LogData[] $logsData
      * @return bool
      */
     protected function putData(Generator $logsData, array $serverData): bool
@@ -317,9 +317,9 @@ class ElasticStorage extends BaseStorage
 
         if ($isErr) {
             $this->owner->error($text . PHP_EOL . json_encode($info), [
-                PhpErrorCatcher::FIELD_NO_TRICE => true,
+                PhpErrorCatcher::FIELD_NO_TRACE => true,
                 PhpErrorCatcher::FIELD_FILE => '',
-                'elastic'
+                'elastic',
             ]);
             return false;
         }

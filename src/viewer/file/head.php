@@ -101,7 +101,7 @@
     .bug_file {
     }
 
-    <?php  foreach ($this->getErrorListView() as $errno => $error): ?>
+    <?php  foreach ($this->getErrorListView() as $errno => $error) : ?>
     .bug_level_<?=$errno?> .bug_type {
         color: <?=$error['color']?>;
     }

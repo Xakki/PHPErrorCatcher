@@ -8,3 +8,6 @@ parameters:
         - src/connector/
         - src/storage/ElasticStorage.php
         - src/storage/PdoStorage.php
+
+includes:
+    - phpstan-baseline.neon

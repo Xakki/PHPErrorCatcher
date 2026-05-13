@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-RUN apk --no-cache  update && apk --no-cache add oniguruma-dev libzip-dev curl-dev
-RUN docker-php-ext-install curl mbstring zip pdo
+RUN apk --no-cache  update && apk --no-cache add oniguruma-dev libzip-dev curl-dev linux-headers
+RUN docker-php-ext-install curl mbstring zip pdo sockets
 RUN docker-php-source delete && rm -rf /var/cache/apk/*
 
 STOPSIGNAL SIGKILL

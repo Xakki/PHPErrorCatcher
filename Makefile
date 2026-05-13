@@ -23,7 +23,7 @@ cs-check:
 	$(composer) cs-check
 
 test:
-	$(composer) phpunit
+	$(docker) vendor/bin/phpunit
 
 phpstan:
 	$(docker) composer phpstan

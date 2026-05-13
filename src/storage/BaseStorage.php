@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
@@ -6,7 +7,6 @@ namespace Xakki\PhpErrorCatcher\storage;
 use Xakki\PhpErrorCatcher\Base;
 use Xakki\PhpErrorCatcher\dto\HttpData;
 use Xakki\PhpErrorCatcher\dto\LogData;
-use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\Tools;
 
 abstract class BaseStorage extends Base
@@ -19,7 +19,7 @@ abstract class BaseStorage extends Base
         return [];
     }
 
-    abstract function write(LogData $logData);
+    abstract public function write(LogData $logData);
 
     public static function getDataHttp(): HttpData
     {
@@ -33,8 +33,9 @@ abstract class BaseStorage extends Base
         } else {
             $data->host = isset($serverData['HTTP_X_SERVER_NAME']) ? $serverData['HTTP_X_SERVER_NAME'] : (isset($serverData['SERVER_NAME']) ? $serverData['SERVER_NAME'] : '');
         }
-        if (!empty($_SERVER['SHELL']))
+        if (!empty($_SERVER['SHELL'])) {
             $data->shell = implode(' ', $_SERVER['argv']);
+        }
 
         if (!empty($serverData['REQUEST_METHOD'])) {
             $data->method = $serverData['REQUEST_METHOD'];

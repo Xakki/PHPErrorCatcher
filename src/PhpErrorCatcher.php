@@ -6,11 +6,12 @@ use DateTime;
 use Exception;
 use Generator;
 use Psr\Log\LoggerInterface;
-use Stringable;
 use Throwable;
 use Xakki\PhpErrorCatcher\contract\CacheInterface;
 use Xakki\PhpErrorCatcher\dto\LogData;
+
 use function error_clear_last;
+
 use const STDERR;
 use const STDOUT;
 
@@ -34,16 +35,16 @@ class PhpErrorCatcher implements LoggerInterface
 
     public const FIELD_LOG_TYPE = 'log_type',
         FIELD_FILE = 'file',
-        FIELD_TRICE = 'trice',
-        FIELD_NO_TRICE = 'trice_no_fake',
+        FIELD_TRACE = 'trace',
+        FIELD_NO_TRACE = 'trace_no_fake',
         FIELD_ERR_CODE = 'error_code',
         FIELD_EXC_CODE = 'exception_code';
 
     protected const LOG_FIELDS = [
         self::FIELD_LOG_TYPE,
         self::FIELD_FILE,
-        self::FIELD_TRICE,
-        self::FIELD_NO_TRICE,
+        self::FIELD_TRACE,
+        self::FIELD_NO_TRACE,
         self::FIELD_ERR_CODE,
     ];
 
@@ -212,6 +213,7 @@ class PhpErrorCatcher implements LoggerInterface
 
     /**
      * Initialization
+     *
      * @param mixed[] $config
      * @return self
      * @throws Throwable
@@ -286,7 +288,6 @@ class PhpErrorCatcher implements LoggerInterface
                 $this,
                 'handleException',
             ]);
-
         } catch (Throwable $e) {
             if (static::$debugMode) {
                 echo 'Cant init logger: ' . $e->__toString();
@@ -331,6 +332,7 @@ class PhpErrorCatcher implements LoggerInterface
 
     /**
      * @deprecated
+     *
      * @param string $key
      * @return mixed
      */
@@ -434,6 +436,7 @@ class PhpErrorCatcher implements LoggerInterface
 
     /**
      * Обработчик триггерных ошибок
+     *
      * @param int        $errno
      * @param string     $errstr
      * @param string     $errfile
@@ -441,6 +444,7 @@ class PhpErrorCatcher implements LoggerInterface
      * @param mixed[]|null $vars
      * @return bool
      */
+    // phpcs:ignore WebimpressCodingStandard.Functions.ReturnType.ReturnValue
     public function handleTrigger(int $errno, string $errstr, string $errfile, int $errline, ?array $vars = null): bool
     {
         if (!(error_reporting() & $errno)) {
@@ -622,19 +626,17 @@ class PhpErrorCatcher implements LoggerInterface
         $logData->levelInt = (int) array_search($logData->level, self::$triggerLevel);
         $logData->type = $fields[self::FIELD_LOG_TYPE];
 
-        if (isset($context[self::FIELD_TRICE])) {
-            if (is_string($context[self::FIELD_TRICE])) {
-                $logData->trace = $context[self::FIELD_TRICE];
+        if (isset($context[self::FIELD_TRACE])) {
+            if (is_string($context[self::FIELD_TRACE])) {
+                $logData->trace = $context[self::FIELD_TRACE];
+            } elseif (is_array($context[self::FIELD_TRACE])) {
+                $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRACE]);
+            } else {
+                $logData->trace = json_encode($context[self::FIELD_TRACE]);
             }
-            elseif (is_array($context[self::FIELD_TRICE])) {
-                $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRICE]);
-            }
-            else {
-                $logData->trace = json_encode($context[self::FIELD_TRICE]);
-            }
-        } elseif (isset(self::$logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRICE])) {
+        } elseif (isset(self::$logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRACE])) {
             $logData->trace = $this->renderDebugTrace(
-                $fields[self::FIELD_TRICE] ?? null,
+                $fields[self::FIELD_TRACE] ?? null,
                 0,
                 (int)self::$logTraceByLevel[$level]
             );
@@ -703,11 +705,13 @@ class PhpErrorCatcher implements LoggerInterface
             return;
         }
         if (empty($_SERVER['argv']) && !defined('CLI')) {
-            if ($this->checkRules($logData, static::$printHttpRules))
+            if ($this->checkRules($logData, static::$printHttpRules)) {
                 $this->printHttp($logData);
+            }
         } else {
-            if ($this->checkRules($logData, static::$printConsoleRules))
+            if ($this->checkRules($logData, static::$printConsoleRules)) {
                 $this->printConsole($logData);
+            }
         }
     }
 
@@ -772,7 +776,7 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         if (method_exists($object, 'getTrace')) {
-            $fields[self::FIELD_TRICE] = $this->renderDebugTrace($object->getTrace(), 0, static::$limitTrace);
+            $fields[self::FIELD_TRACE] = $this->renderDebugTrace($object->getTrace(), 0, static::$limitTrace);
         }
 
         return [$mess, $fields];
@@ -851,6 +855,7 @@ class PhpErrorCatcher implements LoggerInterface
 
     /**
      * Trace print
+     *
      * @param mixed|null $trace
      * @param int $start
      * @param int $limit
@@ -968,79 +973,71 @@ class PhpErrorCatcher implements LoggerInterface
     /***************************************************/
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function emergency(Stringable|string $message, array $context = []): void
+    public function emergency(\Stringable|string $message, array $context = []): void
     {
         $context[] = 'emergency';
         $this->log(self::LEVEL_CRITICAL, $message, $context);
     }
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function alert(Stringable|string $message, array $context = []): void
+    public function alert(\Stringable|string $message, array $context = []): void
     {
         $context[] = 'alert';
         $this->log(self::LEVEL_ALERT, $message, $context);
     }
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function critical(Stringable|string $message, array $context = []): void
+    public function critical(\Stringable|string $message, array $context = []): void
     {
         $this->log(self::LEVEL_CRITICAL, $message, $context);
     }
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function error(Stringable|string $message, array $context = []): void
+    public function error(\Stringable|string $message, array $context = []): void
     {
         $this->log(self::LEVEL_ERROR, $message, $context);
     }
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function warning(Stringable|string $message, array $context = []): void
+    public function warning(\Stringable|string $message, array $context = []): void
     {
         $this->log(self::LEVEL_WARNING, $message, $context);
     }
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function notice(Stringable|string $message, array $context = []): void
+    public function notice(\Stringable|string $message, array $context = []): void
     {
         $this->log(self::LEVEL_NOTICE, $message, $context);
     }
 
     /**
-     * @param Stringable|string $message
-     * @param mixed[]           $context
+     * @param mixed[] $context
      * @return void
      */
-    public function info(Stringable|string $message, array $context = []): void
+    public function info(\Stringable|string $message, array $context = []): void
     {
         $this->log(self::LEVEL_INFO, $message, $context);
     }
 
     /**
-     * @param string|\Stringable $message
      * @param mixed[] $context
      * @return void
      */
@@ -1051,7 +1048,6 @@ class PhpErrorCatcher implements LoggerInterface
 
     /**
      * @param mixed $level
-     * @param string|\Stringable $message
      * @param mixed[] $context
      * @return void
      */
@@ -1063,9 +1059,10 @@ class PhpErrorCatcher implements LoggerInterface
 
         $logData = $this->createLogData($level, $message, $context);
 
-        if ($this->checkRules($logData, static::$ignoreRules)) return;
+        if ($this->checkRules($logData, static::$ignoreRules)) {
+            return;
+        }
 
         $this->add($logData);
     }
-
 }

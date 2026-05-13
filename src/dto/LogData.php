@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\dto;
@@ -30,5 +31,4 @@ class LogData extends AbstractData implements Stringable
     {
         return Tools::safeJsonEncode(get_object_vars($this), JSON_UNESCAPED_UNICODE);
     }
-
 }

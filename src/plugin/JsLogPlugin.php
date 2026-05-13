@@ -41,7 +41,7 @@ class JsLogPlugin extends BasePlugin
         if ($size > 1000)
             $mess = mb_substr($mess, 0, 1000) . '...(' . $size . 'b)...';
         $vars = [
-            PhpErrorCatcher::FIELD_NO_TRICE => true,
+            PhpErrorCatcher::FIELD_NO_TRACE => true,
             PhpErrorCatcher::FIELD_FILE => '',
             'ver' => $_POST['v'],
             'url' => $_POST['u'],
@@ -50,7 +50,7 @@ class JsLogPlugin extends BasePlugin
             'js',
             $this->catcherLogName,
         ];
-        if (!empty($_POST['s'])) $vars[PHPErrorCatcher::FIELD_TRICE] = str_replace('||', PHP_EOL, $_POST['s']);
+        if (!empty($_POST['s'])) $vars[PHPErrorCatcher::FIELD_TRACE] = str_replace('||', PHP_EOL, $_POST['s']);
         if (!empty($_POST['l'])) $vars[PHPErrorCatcher::FIELD_FILE] = $_POST['l'];
 
         $owner->log($this->level, $mess, $vars);

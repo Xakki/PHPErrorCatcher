@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher;
@@ -73,9 +74,13 @@ class Tools
     {
         $m = 1;
         if ($limitMemory) {
-            if (strpos($limitMemory, 'G')) $m = 1024 * 1024 * 1024;
-            elseif (strpos($limitMemory, 'M')) $m = 1024 * 1024;
-            elseif (strpos($limitMemory, 'K')) $m = 1024;
+            if (strpos($limitMemory, 'G')) {
+                $m = 1024 * 1024 * 1024;
+            } elseif (strpos($limitMemory, 'M')) {
+                $m = 1024 * 1024;
+            } elseif (strpos($limitMemory, 'K')) {
+                $m = 1024;
+            }
         }
         return (int) $limitMemory * $m;
     }
@@ -84,7 +89,7 @@ class Tools
     {
         $limitMemory = Tools::convertMemoryToByte(ini_get('memory_limit'));
         if ($limitMemory > 0) {
-            return memory_get_usage() >= ($limitMemory * 0.9);
+            return memory_get_usage() >= $limitMemory * 0.9;
         }
         return false;
     }
@@ -328,6 +333,7 @@ class Tools
 
     /**
      * Экранирование
+     *
      * @param mixed $value
      * @return string
      * @throws Exception
@@ -340,14 +346,15 @@ class Tools
         return htmlspecialchars($value, ENT_NOQUOTES | ENT_IGNORE, 'utf-8');
     }
 
-
     /**
      * Рекурсивно удаляем директорию
      */
     public static function delTree(string $dir): bool
     {
         $dirs = scandir($dir);
-        if (!$dirs) return false;
+        if (!$dirs) {
+            return false;
+        }
 
         $files = array_diff($dirs, [
             '.',

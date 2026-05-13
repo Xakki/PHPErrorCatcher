@@ -2,13 +2,11 @@
 
 namespace Xakki\PhpErrorCatcher\storage;
 
-use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\dto\LogData;
+use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\Tools;
 
 /**
- * Class SyslogStorage
- * @package Xakki\PhpErrorCatcher\storage
  * @method string getLogPath()
  * @method string getLogDir()
  * @method string getBackUpDir()
@@ -28,7 +26,6 @@ class SyslogStorage extends BaseStorage
     protected int $pid;
     protected string $hostname;
     protected int $logSize = 1400;
-
 
     public function __construct(PhpErrorCatcher $owner, $config = [])
     {
@@ -72,11 +69,11 @@ class SyslogStorage extends BaseStorage
         //fwrite(STDOUT, $log);
         //syslog($logData->levelInt, $log);
         $priority = $logData->levelInt + $this->syslogFacility;
-        $log = "<$priority>1 " .
-            date(\DateTime::RFC3339) . ' ' .
-            $this->hostname . ' ' .
-            'php ' . $this->pid . ' - - ' .
-            $log;
+        $log = "<$priority>1 "
+            . date(\DateTime::RFC3339) . ' '
+            . $this->hostname . ' '
+            . 'php ' . $this->pid . ' - - '
+            . $log;
         socket_sendto($this->sock, $log, strlen($log), 0, $this->remoteIp, (int) $this->remotePort);
     }
 
@@ -123,7 +120,9 @@ class SyslogStorage extends BaseStorage
             }
             $len = self::getLen($recordData);
             $limit = $limit * 0.7;
-            if ($i > 4) break;
+            if ($i > 4) {
+                break;
+            }
         }
 
         return Tools::safeJsonEncode($recordData);

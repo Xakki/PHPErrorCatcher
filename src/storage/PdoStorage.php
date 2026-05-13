@@ -6,16 +6,15 @@ use PDO;
 
 class PdoStorage extends BaseStorage
 {
-
     /**
      * @var null|array|callback|PDO
      */
     protected $pdo = null;
     protected $pdoTableName = '_myprof';
 
-
     /**
      * Получаем PDO соединение с БД
+     *
      * @return PDO|null
      */
     public function getPdo()
@@ -34,9 +33,8 @@ class PdoStorage extends BaseStorage
         } elseif ($this->pdo && is_callable($this->pdo)) {
             $this->pdo = call_user_func_array($this->pdo, []);
         }
-        return ($this->pdo instanceof PDO ? $this->pdo : null);
+        return $this->pdo instanceof PDO ? $this->pdo : null;
     }
-
 
     public function viewRenderBD($flag = false)
     {
@@ -44,70 +42,70 @@ class PdoStorage extends BaseStorage
             'id' => [
                 'ID',
                 'filter' => 1,
-                'sort' => 1
+                'sort' => 1,
             ],
             'host' => [
                 'Host',
                 'filter' => 1,
-                'sort' => 1
+                'sort' => 1,
             ],
             'name' => [
                 'Name',
                 'filter' => 1,
                 'sort' => 1,
-                'url' => true
+                'url' => true,
             ],
             'script' => [
                 'Script',
                 'filter' => 1,
-                'sort' => 1
+                'sort' => 1,
             ],
             'time_cr' => [
                 'Create',
                 'filter' => 1,
                 'sort' => 1,
-                'type' => 'date'
+                'type' => 'date',
             ],
             'time_run' => [
                 'Time(ms)',
                 'filter' => 1,
-                'sort' => 1
+                'sort' => 1,
             ],
             'profiler_id' => [
                 'Prof',
-                'url' => $this->owner->getXhprofUrl()
+                'url' => $this->owner->getXhprofUrl(),
             ],
             'ref' => [
                 'Ref',
                 'filter' => 1,
-                'url' => true
+                'url' => true,
             ],
             'info' => [
                 'Info',
                 'filter' => 1,
-                'spoiler' => 1
+                'spoiler' => 1,
             ],
             'json_post' => [
                 'Post',
                 'filter' => 1,
-                'spoiler' => 1
+                'spoiler' => 1,
             ],
             'json_cookies' => [
                 'Cookies',
                 'filter' => 1,
-                'spoiler' => 1
+                'spoiler' => 1,
             ],
             'json_session' => [
                 'Session',
                 'filter' => 1,
-                'spoiler' => 1
+                'spoiler' => 1,
             ],
             'is_secure' => [
                 'HTTPS',
                 'filter' => 1,
                 'sort' => 1,
                 'spoiler' => 1,
-                'type' => 'bool'
+                'type' => 'bool',
             ],
         ];
 
@@ -127,10 +125,10 @@ class PdoStorage extends BaseStorage
         $counts = $stmt->fetch(PDO::FETCH_ASSOC);
         $counts = $counts['cnt'];
         // значение максимальной страницы
-        $max_page = ceil($counts / $itemsOnPage);
-        $paginator = range(1, $max_page ? $max_page : 1);
+        $maxPage = ceil($counts / $itemsOnPage);
+        $paginator = range(1, $maxPage ? $maxPage : 1);
 
-        $page = (($_GET['page'] && $_GET['page'] <= $max_page) ? $_GET['page'] : 1);
+        $page = $_GET['page'] && $_GET['page'] <= $maxPage ? $_GET['page'] : 1;
 
         $query = 'SELECT * FROM ' . $this->owner->get('pdoTableName');
 
@@ -139,7 +137,6 @@ class PdoStorage extends BaseStorage
 
         if (!empty($_GET['fltr'])) {
             foreach ($_GET['fltr'] as $k => $r) {
-
                 if (substr($k, -2) == '_2') {
                     $pair = true;
                     $k = substr($k, 0, -2);
@@ -164,10 +161,8 @@ class PdoStorage extends BaseStorage
                         $where[] = $k . ' LIKE ? ';
                         $param[] = $r;
                     }
-
                 }
             }
-
         }
         if (!empty($_GET['sort'])) {
             $sort = $_GET['sort'];
@@ -192,10 +187,10 @@ class PdoStorage extends BaseStorage
         $html = '';
 
         $html .= '<div style="float:left;">Кол-во:' . $counts . '</div>';
-        if (count($paginator) > 1):
+        if (count($paginator) > 1) :
             $html .= '<ul class="pagination pagination-sm" style="margin:0 0 0 10px;">';
             $getParam = $_GET;
-            foreach ($paginator as $i):
+            foreach ($paginator as $i) :
                 $getParam['page'] = $i;
                 $html .= '<li' . ($i == $page ? ' class="active"' : '') . '><a href="?' . http_build_query($getParam) . '">' . $i . '</a>';
             endforeach;
@@ -212,9 +207,9 @@ class PdoStorage extends BaseStorage
                 $html .= '<th data-field="' . $k . '">' . $r[0] . '';
             }
             if (!empty($r['filter']) && $r['filter']) {
-                $val = (!empty($_GET['fltr'][$k]) ? $_GET['fltr'][$k] : '');
+                $val = !empty($_GET['fltr'][$k]) ? $_GET['fltr'][$k] : '';
                 if (!empty($r['type']) && $r['type'] == 'date') {
-                    $tmp .= '<th class="filter-date"><input type="text" name="fltr[' . $k . ']" value="' . $val . '" class="form-control">' . '<input type="text" name="fltr[' . $k . '_2]" value="' . (!empty($_GET['fltr'][$k . '_2']) ? $_GET['fltr'][$k . '_2'] : '') . '" class="form-control">';
+                    $tmp .= '<th class="filter-date"><input type="text" name="fltr[' . $k . ']" value="' . $val . '" class="form-control"><input type="text" name="fltr[' . $k . '_2]" value="' . (!empty($_GET['fltr'][$k . '_2']) ? $_GET['fltr'][$k . '_2'] : '') . '" class="form-control">';
                 } elseif (!empty($r['type']) && $r['type'] == 'bool') {
                     $sel1 = $sel2 = '';
                     if ($val === '1') {
@@ -229,7 +224,6 @@ class PdoStorage extends BaseStorage
             } else {
                 $tmp .= '<th>';
             }
-
         }
 
         $html .= $tmp . '</tr></thead><tbody>';
@@ -240,12 +234,12 @@ class PdoStorage extends BaseStorage
                 if (!empty($r['type']) && $r['type'] == 'date') {
                     $row[$k] = date('Y-m-d H:i:s', $row[$k]);
                 } elseif (!empty($r['type']) && $r['type'] == 'bool') {
-                    $row[$k] = ($row[$k] ? '+' : '');
+                    $row[$k] = $row[$k] ? '+' : '';
                 } elseif (!empty($r['url']) && $row[$k] && $row[$k] != '*') {
                     if ($r['url'] === true) {
-                        $row[$k] = ($row[$k] ? '<a href="' . (strpos($r['host'], '://') !== false ? '' : $r['host']) . $row[$k] . '" target="_blank">' . substr($row[$k], 0, 15) . '...</a>' : '');
+                        $row[$k] = $row[$k] ? '<a href="' . (strpos($r['host'], '://') !== false ? '' : $r['host']) . $row[$k] . '" target="_blank">' . substr($row[$k], 0, 15) . '...</a>' : '';
                     } else {
-                        $row[$k] = ($row[$k] ? '<a href="' . $r['url'] . $row[$k] . '" target="_blank">' . $row[$k] . '</a>' : '');
+                        $row[$k] = $row[$k] ? '<a href="' . $r['url'] . $row[$k] . '" target="_blank">' . $row[$k] . '</a>' : '';
                     }
                 }
 
@@ -328,7 +322,6 @@ class PdoStorage extends BaseStorage
 
     /******************************************************************************************/
 
-
     private function createDB()
     {
         $sql = 'CREATE TABLE `' . $this->owner->get('pdoTableName') . '` (
@@ -350,5 +343,4 @@ class PdoStorage extends BaseStorage
         $stmt = $this->owner->getPdo()->prepare($sql);
         $stmt->execute();
     }
-
 }

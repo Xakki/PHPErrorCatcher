@@ -8,7 +8,7 @@ use yii\log\Logger;
 class YiiLogger extends Logger
 {
     public $targets = [];
-    static $toMylevels = [
+    public static $toMylevels = [
         self::LEVEL_ERROR => PhpErrorCatcher::LEVEL_ERROR,
         self::LEVEL_WARNING => PhpErrorCatcher::LEVEL_WARNING,
         self::LEVEL_INFO => PhpErrorCatcher::LEVEL_INFO,

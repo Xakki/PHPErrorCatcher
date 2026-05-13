@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\viewer;
@@ -72,7 +73,6 @@ class FileViewer extends BaseViewer
             'debug' => 0,
         ],
     ];
-
 
     public function __construct(PhpErrorCatcher $owner, array $config = [])
     {
@@ -183,7 +183,6 @@ class FileViewer extends BaseViewer
                         exit;
                     }
 
-
                     $this->renderViewBreadCrumb($url);
 
                     if (!$this->fileStorage->checkIsBackUp($file)) {
@@ -214,6 +213,7 @@ class FileViewer extends BaseViewer
 
     /**
      * Просмотр Директории логов
+     *
      * @param string $path
      * @return array<string, array<int, int|string>>
      */
@@ -234,7 +234,9 @@ class FileViewer extends BaseViewer
         }
         $isBackUpDir = $this->fileStorage->checkIsBackUp($fullPath);
         $dir = dir($fullPath);
-        if (!$dir) return [];
+        if (!$dir) {
+            return [];
+        }
         $homeUrl = $this->getHomeUrl();
 
         while (false !== ($entry = $dir->read())) {
@@ -278,8 +280,8 @@ class FileViewer extends BaseViewer
                     '<a href="' . $fileUrl . '" style="' . (is_dir($filePath) ? 'font-weight:bold;' : '') . '">' . $path . '/' . $entry . '</a> ',
                     $size,
                     $create,
-                    ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Download</a>' : '') .
-                    (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
+                    ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Download</a>' : '')
+                    . (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
                     $createTime,
                 ];
                 // glyphicon glyphicon-hdd
@@ -298,6 +300,7 @@ class FileViewer extends BaseViewer
 
     /**
      * Рендер директории логов
+     *
      * @param array<int, array<int, string>> $dirList
      * @return void
      */
@@ -406,7 +409,9 @@ class FileViewer extends BaseViewer
     protected function renderViewBreadCrumb(string $url): void
     {
         $temp = preg_split('/\//', $url, -1, PREG_SPLIT_NO_EMPTY);
-        if (!$temp) return;
+        if (!$temp) {
+            return;
+        }
         $basePath = $fullPath = $this->getHomeUrl('');
         $ctr = '<li class="breadcrumb-item"><a href="' . $basePath . '">Home</a></li>';
         foreach ($temp as $r) {
@@ -475,7 +480,7 @@ class FileViewer extends BaseViewer
      * Render line
      *
      * @param HttpData $httpData
-     * @param LogData[]|Generator $logs
+     * @param Generator<LogData> $logs
      * @return void
      */
     public function renderAllLogs(HttpData $httpData, Generator $logs): void
@@ -488,15 +493,15 @@ class FileViewer extends BaseViewer
         echo '<div class="bugs">';
         if (!empty($httpData->shell)) {
             echo '<span class="bugs_uri">console / ' . $httpData->shell . '</span> ';
-        }
-        else {
+        } else {
             if (!empty($httpData->method)) {
                 echo '<span class="bugs_uri">' . $httpData->method . '</span> ';
             }
-            if (!empty($httpData->url))
+            if (!empty($httpData->url)) {
                 echo '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
-            elseif (!empty($httpData->host))
+            } elseif (!empty($httpData->host)) {
                 echo '<div class="bugs_uri">' . $httpData->host . '</div> ';
+            }
         }
 
         if (!empty($httpData->ipAddr)) {
@@ -555,5 +560,4 @@ class FileViewer extends BaseViewer
 
         echo '</div>';
     }
-
 }

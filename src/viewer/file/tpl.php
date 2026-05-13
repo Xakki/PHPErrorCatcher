@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
@@ -20,7 +21,7 @@ $tabs = [
 ?>
 <html>
 <head>
-    <title>LogView<?= ($file ? ':' . $file : '') ?></title>
+    <title>LogView<?= $file ? ':' . $file : '' ?></title>
     <meta http-equiv="Cache-Control" content="no-cache">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -71,20 +72,20 @@ $tabs = [
 <body>
 
 <ul class="nav nav-tabs">
-    <li class="nav-item"><a class="nav-link<?=(!isset($tabs[$file]) ? ' active' : '')?>" href="<?=$home?>/">Логи</a></li>
+    <li class="nav-item"><a class="nav-link<?=!isset($tabs[$file]) ? ' active' : ''?>" href="<?=$home?>/">Логи</a></li>
 
-    <?php if (file_exists($this->getOwner()->getRawLogFile())): ?>
-        <li class="nav-item"><a class="text-danger nav-link<?=($file=='rawlog' ? ' active' : '')?>" href="<?=$home?>rawlog">Errors</a></li>
+    <?php if (file_exists($this->getOwner()->getRawLogFile())) : ?>
+        <li class="nav-item"><a class="text-danger nav-link<?=$file == 'rawlog' ? ' active' : ''?>" href="<?=$home?>rawlog">Errors</a></li>
     <?php endif; ?>
 
-    <?php foreach ($this->getOwner()->getStorages() as $stClass => $st): ?>
-        <?php foreach ($st->getViewMenu() as $fName => $menuName): ?>
-            <li class="nav-item"><a class="text-danger nav-link<?=(($file=='storage' && $_GET['fname'] == $stClass.'/'.$fName)? ' active' : '')?>" href="<?=$home?>storage&fname=<?=$stClass.'/'.$fName?>"><?=$menuName?></a></li>
+    <?php foreach ($this->getOwner()->getStorages() as $stClass => $st) : ?>
+        <?php foreach ($st->getViewMenu() as $fName => $menuName) : ?>
+            <li class="nav-item"><a class="text-danger nav-link<?=$file == 'storage' && $_GET['fname'] == $stClass . '/' . $fName ? ' active' : ''?>" href="<?=$home?>storage&fname=<?=$stClass . '/' . $fName?>"><?=$menuName?></a></li>
         <?php endforeach; ?>
     <?php endforeach; ?>
-    <li class="nav-item"><a class="nav-link<?=($file == 'PHPINFO' ? ' active' : '')?>" href="<?=$home?>PHPINFO">PHPINFO</a></li>
-    <li class="nav-item"><a class="nav-link<?=($file == 'Memcached' ? ' active' : '')?>" href="<?=$home?>Memcached">Memcached</a></li>
-    <?php foreach ($this->extraLinks as $name => $url): ?>
+    <li class="nav-item"><a class="nav-link<?=$file == 'PHPINFO' ? ' active' : ''?>" href="<?=$home?>PHPINFO">PHPINFO</a></li>
+    <li class="nav-item"><a class="nav-link<?=$file == 'Memcached' ? ' active' : ''?>" href="<?=$home?>Memcached">Memcached</a></li>
+    <?php foreach ($this->extraLinks as $name => $url) : ?>
         <li class="nav-item"><a class="nav-link" href="<?=$url?>" target="_blank"><?=$name?></a></li>
     <?php endforeach; ?>
     <li class="nav-item"><a class="nav-link">Core ver: <?=PhpErrorCatcher::VERSION?>. Viewer ver: <?=FileViewer::VERSION?></a></li>

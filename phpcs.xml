@@ -7,6 +7,8 @@
     <arg name="cache" value=".phpcs-cache"/>
     <arg name="colors"/>
 
+    <file>src/</file>
+
     <rule ref="PSR12">
         <exclude name="Squiz.WhiteSpace.ControlStructureSpacing.SpacingAfterOpen"/>
         <exclude name="Squiz.WhiteSpace.ControlStructureSpacing.SpacingBeforeClose"/>
