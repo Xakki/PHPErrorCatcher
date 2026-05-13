@@ -245,18 +245,18 @@ class Tools
     }
 
     /**
-     * @param array<string, string> $traceItem
+     * @param array<string, mixed> $traceItem
      * @param string[] $exclude
      * @return bool
      */
     public static function isTraceHasExclude(array $traceItem, array $exclude): bool
     {
         $exclude[] = 'phperrorcatcher';
-        return self::containExclude($traceItem['file'] ?? $traceItem['class'], $exclude);
+        return self::containExclude((string) ($traceItem['file'] ?? $traceItem['class'] ?? ''), $exclude);
     }
 
     /**
-     * @param array<int, array<string, array|int|object|string>> $trace
+     * @param array<int, array<string, mixed>> $trace
      * @param string[] $lineExclude
      * @return string
      */
@@ -267,10 +267,8 @@ class Tools
                 continue;
             }
             if (!empty($item['file'])) {
-                return $item['file'] . ':' . $item['line'];
+                return (string) $item['file'] . ':' . (string) ($item['line'] ?? '');
             }
-//            return (!empty($item['class']) ? $item['class'] . '::' : '')
-//                . (!empty($item['function']) ? $traceItem['function'] . '()' : '');
         }
         return '';
     }

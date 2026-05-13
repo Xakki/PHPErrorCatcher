@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
 
+use Exception;
+use Generator;
+use Xakki\PhpErrorCatcher\dto\HttpData;
 use Xakki\PhpErrorCatcher\dto\LogData;
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\Tools;
 
 /**
  * @method string getLogPath()
@@ -27,6 +31,7 @@ class FileStorage extends BaseStorage
     protected int $limitFileSize = 10485760;
     protected string $tmpFile;
     protected bool $isEmptyTmpFile = true;
+    /** @var array<string, int> */
     protected array $logKeys = [];
 
     public const FILE_EXT = 'plog';
@@ -84,6 +89,9 @@ class FileStorage extends BaseStorage
             return;
         }
         $lastSlash = strrpos($this->tplPath, '/');
+        if ($lastSlash === false) {
+            $lastSlash = strlen($this->tplPath);
+        }
         $fileName = strftime(substr($this->tplPath, 0, $lastSlash));
 
         $fileName = $this->getFullLogDir() . $fileName;
@@ -95,7 +103,8 @@ class FileStorage extends BaseStorage
             }
         }
 
-        $fileName = $fileName . '/' . trim(strftime(substr($this->tplPath, $lastSlash)), '/');
+        $suffix = substr($this->tplPath, $lastSlash);
+        $fileName = $fileName . '/' . trim((string) strftime($suffix), '/');
         $maxLevel = $this->owner->getHighLevelLogs();
         if ($maxLevel) {
             $fileName .= '.' . $maxLevel;
@@ -142,5 +151,63 @@ class FileStorage extends BaseStorage
     public function checkIsBackUp(string $file): bool
     {
         return str_contains($file, $this->getLogPath() . $this->getBackUpDir());
+    }
+
+    /**
+     * @return Generator<array{http: HttpData, logs: Generator<LogData>}>
+     * @throws Exception
+     */
+    public static function iterateFileLog(string $file): Generator
+    {
+        if (!file_exists($file)) {
+            throw new Exception('No file');
+        }
+
+        $fileHandle = fopen($file, 'r');
+        if ($fileHandle === false) {
+            throw new Exception('Cannot open file');
+        }
+        try {
+            while (!feof($fileHandle)) {
+                $line = fgets($fileHandle);
+                if (!$line) {
+                    continue;
+                }
+                yield self::unSerializeFileLine($line);
+
+                if (Tools::isMemoryOver()) {
+                    throw new Exception('Is memory over');
+                }
+            }
+        } finally {
+            fclose($fileHandle);
+        }
+    }
+
+    /**
+     * @return array{http: HttpData, logs: Generator<LogData>}
+     * @throws Exception
+     */
+    protected static function unSerializeFileLine(string $line): array
+    {
+        $data = json_decode($line, true);
+        if (!is_array($data) || empty($data['http']) || empty($data['logs'])) {
+            throw new Exception('Not support line');
+        }
+        return [
+            'http' => HttpData::init($data['http']),
+            'logs' => self::getLogGenerator($data['logs']),
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $logs
+     * @return Generator<LogData>
+     */
+    protected static function getLogGenerator(array $logs): Generator
+    {
+        foreach ($logs as $logData) {
+            yield LogData::init($logData);
+        }
     }
 }

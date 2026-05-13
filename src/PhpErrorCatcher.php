@@ -105,7 +105,7 @@ class PhpErrorCatcher implements LoggerInterface
     protected static int $maxLenMessage = 5000;
 
     /**
-     * @var array<string, string>
+     * @var string[]
      */
     protected static array $logTags = [];
 
@@ -165,8 +165,9 @@ class PhpErrorCatcher implements LoggerInterface
 
     protected int $count = 0;
     protected int $errCount = 0;
-    /** @var array<int, int>  */
-    protected $countByLevel = [];
+    protected string $globalTag = '';
+    /** @var array<string, int> */
+    protected array $countByLevel = [];
     protected float $timeStart = 0;
     protected int $timeEnd = 0;
     protected string $sessionKey = '';
@@ -411,7 +412,7 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         if ($this->logTimeProfiler) {
-            $this->log(self::LEVEL_TIME, $this->timeEnd, ['execution']);
+            $this->log(self::LEVEL_TIME, (string) $this->timeEnd, ['execution']);
         }
 
         if (self::$userCatchLogFlag) {
@@ -422,10 +423,13 @@ class PhpErrorCatcher implements LoggerInterface
 
     public function needSaveLog(): bool
     {
-        if ($this->debugMode) {
+        if (static::$debugMode) {
             return true;
         }
-        return $this->getCountByLevelAndLess($this->saveLogIfHasError) > 0;
+        if (!static::$saveLogIfHasError) {
+            return true;
+        }
+        return $this->errCount > 0;
     }
 
     public function handleException(Throwable $e): void
@@ -592,12 +596,12 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * @param int $level
+     * @param string $level
      * @param mixed $message
      * @param mixed[] $context
      * @return LogData
      */
-    protected function createLogData($level, mixed $message, array $context = []): LogData
+    protected function createLogData(string $level, mixed $message, array $context = []): LogData
     {
         if (isset(self::$errorLevel[$level])) {
             $this->errCount++;
@@ -632,7 +636,7 @@ class PhpErrorCatcher implements LoggerInterface
             } elseif (is_array($context[self::FIELD_TRACE])) {
                 $logData->trace = $this->renderDebugTrace($context[self::FIELD_TRACE]);
             } else {
-                $logData->trace = json_encode($context[self::FIELD_TRACE]);
+                $logData->trace = (string) json_encode($context[self::FIELD_TRACE]);
             }
         } elseif (isset(self::$logTraceByLevel[$level]) && empty($fields[self::FIELD_NO_TRACE])) {
             $logData->trace = $this->renderDebugTrace(
@@ -722,7 +726,8 @@ class PhpErrorCatcher implements LoggerInterface
 
     protected function printConsole(LogData $logData): void
     {
-        $output = PHP_EOL . rtrim(DateTime::createFromFormat('U.u', (string) $logData->timestamp)?->format('H:i:s.u'), '0')
+        $dt = DateTime::createFromFormat('U.u', (string) $logData->timestamp);
+        $output = PHP_EOL . ($dt ? rtrim($dt->format('H:i:s.u'), '0') : '')
             . ' ' . Tools::cliColor($logData->level, self::CLI_LEVEL_COLOR[$logData->level]);
         if ($logData->tags) {
             $output .= Tools::cliColor(' [' . implode(', ', $logData->tags) . ']', Tools::COLOR_GRAY);

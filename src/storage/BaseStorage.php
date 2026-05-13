@@ -19,7 +19,7 @@ abstract class BaseStorage extends Base
         return [];
     }
 
-    abstract public function write(LogData $logData);
+    abstract public function write(LogData $logData): void;
 
     public static function getDataHttp(): HttpData
     {

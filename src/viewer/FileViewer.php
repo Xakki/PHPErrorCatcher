@@ -161,6 +161,9 @@ class FileViewer extends BaseViewer
                     if (isset($_GET['only'])) {
                         $size = filesize($file);
                         $handle = fopen($file, 'rb');
+                        if ($handle === false) {
+                            return;
+                        }
 
                         ini_set('max_execution_time', 0);
                         // Set headers to force download
@@ -301,7 +304,7 @@ class FileViewer extends BaseViewer
     /**
      * Рендер директории логов
      *
-     * @param array<int, array<int, string>> $dirList
+     * @param array<string, array<int, int|string>> $dirList
      * @return void
      */
     protected function renderViewDirList(array $dirList): void
