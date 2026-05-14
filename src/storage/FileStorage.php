@@ -39,7 +39,7 @@ class FileStorage extends BaseStorage
     public function __construct(PhpErrorCatcher $owner, $config = [])
     {
         parent::__construct($owner, $config);
-        $this->tmpFile = $this->getFullLogDir() . ':' . uniqid('tmp_', true) . rand(1, 1000000) . ':' . (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+        $this->tmpFile = $this->getFullLogDir() . '_' . uniqid('tmp_', true) . rand(1, 1000000) . '_' . (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
     }
 
     public function __destruct()

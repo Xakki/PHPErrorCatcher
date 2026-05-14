@@ -159,6 +159,11 @@ class PhpErrorCatcher implements LoggerInterface
     protected static int $cacheLifeTime = 600;
     protected static bool $saveLogIfHasError = false;
 
+    // Защита от лавины: после `$maxLogsPerRequest` запись лога дропается;
+    // на первом превышении пишется одиночное предупреждение в STDERR.
+    // 0 — лимит выключен.
+    protected static int $maxLogsPerRequest = 100;
+
     /************************************/
     // Variable
     /************************************/
@@ -456,10 +461,17 @@ class PhpErrorCatcher implements LoggerInterface
             return true;
         }
 
+        // Снимаем стек прямо в обработчике, чтобы он указывал на точку ошибки,
+        // а не на фреймы внутри PhpErrorCatcher::log()/createLogData().
+        $trace = debug_backtrace(
+            static::$traceShowArgs ? DEBUG_BACKTRACE_PROVIDE_OBJECT : DEBUG_BACKTRACE_IGNORE_ARGS,
+            static::$limitTrace + 1
+        );
         $fields = [
             self::FIELD_FILE => $this->getRelativeFilePath($errfile) . ':' . $errline,
             self::FIELD_LOG_TYPE => self::TYPE_TRIGGER,
             self::FIELD_ERR_CODE => $errno,
+            self::FIELD_TRACE => array_slice($trace, 1),
         ];
 
         $this->log(self::$triggerLevel[$errno], $errstr, $fields);
@@ -661,23 +673,24 @@ class PhpErrorCatcher implements LoggerInterface
 
     protected function add(LogData $logData): void
     {
-        $result = false;
         $key = $logData->logKey;
+
+        if ($this->checkRules($logData, static::$stopRules)) {
+            $this->printLog($logData);
+            exit();
+        }
+
+        $cached = false;
         if ($this->cache()) {
             if (isset($this->logCached[$key])) {
                 $logData->count += $this->logCached[$key];
             }
             try {
-                if ($this->checkRules($logData, static::$stopRules)) {
-                    $this->printLog($logData);
-                    exit();
-                }
-
                 $str = $logData->__toString();
                 if ($str) {
                     // @phpstan-ignore-next-line
                     $this->cache()?->set($key, $str, self::$cacheLifeTime);
-                    $result = true;
+                    $cached = true;
                 }
             } catch (Throwable $e) {
                 $this->printLog($logData);
@@ -685,7 +698,7 @@ class PhpErrorCatcher implements LoggerInterface
             }
         }
 
-        if (!$result) {
+        if (!$cached) {
             if (isset($this->logData[$key])) {
                 $this->logData[$key]->count++;
             } else {
@@ -698,9 +711,18 @@ class PhpErrorCatcher implements LoggerInterface
                 $this->logCached[$key] = 1;
             }
         }
+
+        // В режиме startCatchLog() — только помечаем ключи, в storage не пишем
+        // (логи будут возвращены через endCatchLog()).
         if (self::$userCatchLogFlag) {
             self::$userCatchLogKeys[$key] = true;
+        } else {
+            foreach (static::$storages as $store) {
+                $store->write($logData);
+            }
         }
+
+        $this->printLog($logData);
     }
 
     protected function printLog(LogData $logData): void
@@ -841,6 +863,30 @@ class PhpErrorCatcher implements LoggerInterface
     public static function startCatchLog(): void
     {
         self::$userCatchLogFlag = true;
+        self::$userCatchLogKeys = [];
+    }
+
+    public function getCatchLogCount(): int
+    {
+        return self::$userCatchLogFlag ? count(self::$userCatchLogKeys) : 0;
+    }
+
+    /**
+     * @return LogData[]
+     * @throws Exception
+     */
+    public function endCatchLog(): array
+    {
+        if (!self::$userCatchLogFlag) {
+            return [];
+        }
+        $logs = [];
+        foreach ($this->getDataLogsGenerator() as $log) {
+            $logs[] = $log;
+        }
+        self::$userCatchLogFlag = false;
+        self::$userCatchLogKeys = [];
+        return $logs;
     }
 
     /**
@@ -958,8 +1004,9 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         if (static::$logCookieKey && !empty($_COOKIE[static::$logCookieKey])) {
-            // для поиска только нужных логов
-            $tags[] = $_COOKIE[static::$logCookieKey];
+            // Для поиска нужных логов внешней индексацией — пишем как поле,
+            // а не тег, чтобы попадало в context/fields у storage'ей (Stream/Elastic).
+            $fields['logCookieKey'] = $_COOKIE[static::$logCookieKey];
         }
 
         if (count(static::$logTags)) {
@@ -1059,6 +1106,20 @@ class PhpErrorCatcher implements LoggerInterface
     public function log($level, string|\Stringable $message, array $context = []): void
     {
         if (!static::$debugMode && $level === self::LEVEL_DEBUG) {
+            return;
+        }
+
+        if (static::$maxLogsPerRequest > 0 && $this->count >= static::$maxLogsPerRequest) {
+            // createLogData() обычно инкрементит $count — здесь его нет,
+            // считаем сами, иначе никогда не словим "ровно граничный" момент.
+            $this->count++;
+            if ($this->count === static::$maxLogsPerRequest + 1) {
+                fwrite(
+                    STDERR,
+                    '[' . date('Y-m-d H:i:s') . '] PhpErrorCatcher: too many logs in single request ('
+                    . static::$maxLogsPerRequest . '), dropping the rest' . PHP_EOL
+                );
+            }
             return;
         }
 

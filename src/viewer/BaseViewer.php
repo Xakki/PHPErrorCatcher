@@ -22,4 +22,11 @@ abstract class BaseViewer extends Base
     }
 
     abstract public function renderItemLog(LogData $logData): void;
+
+    public function renderItemLogString(LogData $logData): string
+    {
+        ob_start();
+        $this->renderItemLog($logData);
+        return (string) ob_get_clean();
+    }
 }

@@ -50,6 +50,6 @@
     "phpstan": "phpstan analyse --memory-limit 1G",
     "cs-check": "phpcs",
     "cs-fix": "phpcbf",
-    "test": "phpunit"
+    "phpunit": "phpunit"
   }
 }

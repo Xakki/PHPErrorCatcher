@@ -25,6 +25,11 @@ class ElasticStorage extends BaseStorage
         }
     }
 
+    // Аккумулируется в PhpErrorCatcher::$logData / $logCached, отправляется bulk в __destruct().
+    public function write(LogData $logData): void
+    {
+    }
+
     public function getViewMenu(): array
     {
         $menu = [];

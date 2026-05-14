@@ -3,6 +3,7 @@
 namespace Xakki\PhpErrorCatcher\storage;
 
 use PDO;
+use Xakki\PhpErrorCatcher\dto\LogData;
 
 class PdoStorage extends BaseStorage
 {
@@ -11,6 +12,11 @@ class PdoStorage extends BaseStorage
      */
     protected $pdo = null;
     protected $pdoTableName = '_myprof';
+
+    // Заглушка: запись в БД пока не реализована, чтобы класс был не abstract.
+    public function write(LogData $logData): void
+    {
+    }
 
     /**
      * Получаем PDO соединение с БД
