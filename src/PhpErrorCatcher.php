@@ -419,11 +419,6 @@ class PhpErrorCatcher implements LoggerInterface
         if ($this->logTimeProfiler) {
             $this->log(self::LEVEL_TIME, (string) $this->timeEnd, ['execution']);
         }
-
-        if (self::$userCatchLogFlag) {
-            $this->log(self::LEVEL_WARNING, 'Miss flush userCatchLog');
-            self::$userCatchLogFlag = false;
-        }
     }
 
     public function needSaveLog(): bool
@@ -675,11 +670,6 @@ class PhpErrorCatcher implements LoggerInterface
     {
         $key = $logData->logKey;
 
-        if ($this->checkRules($logData, static::$stopRules)) {
-            $this->printLog($logData);
-            exit();
-        }
-
         $cached = false;
         if ($this->cache()) {
             if (isset($this->logCached[$key])) {
@@ -723,6 +713,9 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         $this->printLog($logData);
+        if ($this->checkRules($logData, static::$stopRules)) {
+            exit();
+        }
     }
 
     protected function printLog(LogData $logData): void
@@ -862,13 +855,14 @@ class PhpErrorCatcher implements LoggerInterface
 
     public static function startCatchLog(): void
     {
+        if (self::$userCatchLogFlag) return;
         self::$userCatchLogFlag = true;
         self::$userCatchLogKeys = [];
     }
 
     public function getCatchLogCount(): int
     {
-        return self::$userCatchLogFlag ? count(self::$userCatchLogKeys) : 0;
+        return count(self::$userCatchLogKeys);
     }
 
     /**
