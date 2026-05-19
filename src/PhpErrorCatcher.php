@@ -634,7 +634,13 @@ class PhpErrorCatcher implements LoggerInterface
         $logData = new LogData();
         $logData->message = Tools::prepareMessage($message, self::$maxLenMessage);
         $logData->level = $level;
-        $logData->levelInt = (int) array_search($logData->level, self::$triggerLevel);
+        // levelInt — это syslog-приоритет (LOG_*), его потребляют storages
+        // (StreamStorage::$monologLevel, SyslogStorage facility, Stream/FileStorage
+        // фильтры) как syslog. Раньше искали в $triggerLevel (ключи = E_*),
+        // E_*/LOG_* пересекаются (E_WARNING=2==LOG_CRIT=2, E_ERROR=1==LOG_ALERT=1)
+        // → warning логировался как CRITICAL, error как ALERT и т.д. Ищем в
+        // $logLevel (ключи = LOG_*).
+        $logData->levelInt = (int) array_search($logData->level, self::$logLevel);
         $logData->type = $fields[self::FIELD_LOG_TYPE];
 
         if (isset($context[self::FIELD_TRACE])) {
