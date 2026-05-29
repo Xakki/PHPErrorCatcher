@@ -34,7 +34,7 @@ abstract class BaseStorage extends Base
             $data->host = isset($serverData['HTTP_X_SERVER_NAME']) ? $serverData['HTTP_X_SERVER_NAME'] : (isset($serverData['SERVER_NAME']) ? $serverData['SERVER_NAME'] : '');
         }
         if (!empty($_SERVER['SHELL'])) {
-            $data->shell = implode(' ', $_SERVER['argv']);
+            $data->consoleArgv = implode(' ', $_SERVER['argv']);
         }
 
         if (!empty($serverData['REQUEST_METHOD'])) {

@@ -494,8 +494,8 @@ class FileViewer extends BaseViewer
         //            $profilerUrlTag = '<div class="bugs_prof">XHPROF: <a href="' . $this->_profilerUrl . '">' . $this->_profilerId . '</a></div>';
         //        }
         echo '<div class="bugs">';
-        if (!empty($httpData->shell)) {
-            echo '<span class="bugs_uri">console / ' . $httpData->shell . '</span> ';
+        if (!empty($httpData->consoleArgv)) {
+            echo '<span class="bugs_uri">console / ' . $httpData->consoleArgv . '</span> ';
         } else {
             if (!empty($httpData->method)) {
                 echo '<span class="bugs_uri">' . $httpData->method . '</span> ';

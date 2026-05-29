@@ -154,29 +154,19 @@ class StreamStorage extends BaseStorage
         $monoLevel = self::$monologLevel[$logData->levelInt] ?? 100;
         $monoLevelName = self::$monologLevelName[$monoLevel] ?? 'DEBUG';
 
-        $context = $logData->fields;
-        if (isset($logData->type) && $logData->type !== '') {
-            $context['log_type'] = $logData->type;
-        }
+        $context = self::getDataHttp()->__toArray() + $logData->fields;
         if (isset($logData->file) && $logData->file !== '') {
             $context['file'] = $logData->file;
-        }
-        if (isset($logData->logKey) && $logData->logKey !== '') {
-            $context['log_key'] = $logData->logKey;
         }
         if ($this->includeStacktraces && $logData->trace) {
             $context['trace'] = $logData->trace;
         }
 
-        $extra = self::getDataHttp()->__toArray();
-        $extra['ver'] = PhpErrorCatcher::VERSION;
+        $extra = [];
+        $extra['log_ver'] = PhpErrorCatcher::VERSION;
         $pid = getmypid();
         if ($pid !== false) {
             $extra['pid'] = $pid;
-        }
-        $hostname = gethostname();
-        if ($hostname !== false) {
-            $extra['hostname'] = $hostname;
         }
         if ($this->extraFields) {
             $extra = array_merge($extra, $this->extraFields);
@@ -190,6 +180,9 @@ class StreamStorage extends BaseStorage
             'channel' => $this->channel,
             'datetime' => $this->formatDateTime($logData->timestamp),
             'extra' => $extra,
+            'log_type' => $logData->type,
+            'log_count' => $logData->count,
+            'tags' => implode(',', $logData->tags),
         ];
     }
 
