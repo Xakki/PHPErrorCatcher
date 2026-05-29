@@ -1,0 +1,23 @@
+theme: jekyll-theme-cayman
+
+title: PHPErrorCatcher
+description: "Catch and log all PHP & JS errors to pluggable storage backends (PSR-3)."
+
+exclude:
+  - vendor/
+  - src/
+  - tests/
+  - example/
+  - Makefile
+  - composer.json
+  - composer.lock
+  - package.json
+  - phpcs.xml
+  - phpstan.neon
+  - phpunit.xml.dist
+  - compose.test.yml
+  - Dockerfile
+  - .phpcs-cache
+  - .htaccess
+  - .gitattributes
+  - CHANGELOG.md

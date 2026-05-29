@@ -4,50 +4,36 @@ declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\storage;
 
-use DateTime;
-use DateTimeZone;
 use Xakki\PhpErrorCatcher\dto\LogData;
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\Tools;
 
 /**
- * Пишет логи в STDOUT/STDERR в формате, совместимом с Monolog
+ * Writes logs to STDOUT/STDERR in a format compatible with Monolog
  * \Monolog\Formatter\JsonFormatter (BATCH_MODE_NEWLINES, NDJSON).
- * Предназначено для подбора Docker-логов через fluent-bit и пересылки
- * в Graylog по GELF.
+ * Intended for collecting Docker logs via fluent-bit and forwarding them
+ * to Graylog over GELF.
  *
- * Запись имеет вид (по одной на строку, разделитель `\n`):
+ * The record is built by the shared BaseStorage::buildRecord() — one line per
+ * record, separated by `\n`:
  * {"message":"...","context":{...},"level":400,"level_name":"ERROR",
  *  "channel":"php","datetime":"2026-04-27T10:00:00.123456+00:00","extra":{...}}
  *
  * @method string getStream()
  * @method bool getSplitByLevel()
  * @method int getMinLevelInt()
- * @method string getChannel()
- * @method array<string, mixed> getExtraFields()
- * @method bool getIncludeStacktraces()
  */
 class StreamStorage extends BaseStorage
 {
-    /** Куда писать: 'php://stderr', 'php://stdout' или путь к файлу. */
+    /** Where to write: 'php://stderr', 'php://stdout' or a file path. */
     protected string $stream = 'php://stderr';
-    /** Если true: warning+ → stderr, ниже → stdout. Перекрывает $stream. */
+    /** If true: warning+ → stderr, lower → stdout. Overrides $stream. */
     protected bool $splitByLevel = false;
-    /** Игнорировать всё, что ниже этого syslog-уровня (LOG_DEBUG = 7). */
+    /** Ignore anything below this syslog level (LOG_DEBUG = 7). */
     protected int $minLevelInt = LOG_DEBUG;
-    /** Имя канала Monolog (поле "channel"). */
-    protected string $channel = 'php';
-    /**
-     * Статические поля, добавляются в "extra" каждой записи.
-     *
-     * @var array<string, mixed>
-     */
-    protected array $extraFields = [];
-    /** Сохранять trace в context.trace полностью. */
-    protected bool $includeStacktraces = true;
-    /** Флаги json_encode. */
+    /** json_encode flags. */
     protected int $jsonFlags = 0;
-    /** Максимальная длина итоговой JSON-строки, 0 — без ограничения. */
+    /** Maximum length of the resulting JSON line, 0 — unlimited. */
     protected int $maxLineLength = 0;
 
     /** @var resource|null */
@@ -56,38 +42,6 @@ class StreamStorage extends BaseStorage
     private $sStderr;
     /** @var resource|null */
     private $sCustom;
-
-    /**
-     * Маппинг syslog → Monolog level.
-     *
-     * @var array<int, int>
-     */
-    private static array $monologLevel = [
-        LOG_DEBUG => 100,
-        LOG_INFO => 200,
-        LOG_NOTICE => 250,
-        LOG_WARNING => 300,
-        LOG_ERR => 400,
-        LOG_CRIT => 500,
-        LOG_ALERT => 550,
-        LOG_EMERG => 600,
-    ];
-
-    /**
-     * Имя уровня Monolog.
-     *
-     * @var array<int, string>
-     */
-    private static array $monologLevelName = [
-        100 => 'DEBUG',
-        200 => 'INFO',
-        250 => 'NOTICE',
-        300 => 'WARNING',
-        400 => 'ERROR',
-        500 => 'CRITICAL',
-        550 => 'ALERT',
-        600 => 'EMERGENCY',
-    ];
 
     /**
      * @param array<string, string|int> $config
@@ -142,68 +96,6 @@ class StreamStorage extends BaseStorage
         if ($target !== null && is_resource($target)) {
             fwrite($target, $line);
         }
-    }
-
-    /**
-     * Собирает запись в формате Monolog\Formatter\JsonFormatter.
-     *
-     * @return array<string, mixed>
-     */
-    protected function buildRecord(LogData $logData): array
-    {
-        $monoLevel = self::$monologLevel[$logData->levelInt] ?? 100;
-        $monoLevelName = self::$monologLevelName[$monoLevel] ?? 'DEBUG';
-
-        $context = $logData->fields;
-        if (isset($logData->type) && $logData->type !== '') {
-            $context['log_type'] = $logData->type;
-        }
-        if (isset($logData->file) && $logData->file !== '') {
-            $context['file'] = $logData->file;
-        }
-        if (isset($logData->logKey) && $logData->logKey !== '') {
-            $context['log_key'] = $logData->logKey;
-        }
-        if ($this->includeStacktraces && $logData->trace) {
-            $context['trace'] = $logData->trace;
-        }
-
-        $extra = self::getDataHttp()->__toArray();
-        $extra['ver'] = PhpErrorCatcher::VERSION;
-        $pid = getmypid();
-        if ($pid !== false) {
-            $extra['pid'] = $pid;
-        }
-        $hostname = gethostname();
-        if ($hostname !== false) {
-            $extra['hostname'] = $hostname;
-        }
-        if ($this->extraFields) {
-            $extra = array_merge($extra, $this->extraFields);
-        }
-
-        return [
-            'message' => $logData->message,
-            'context' => $context,
-            'level' => $monoLevel,
-            'level_name' => $monoLevelName,
-            'channel' => $this->channel,
-            'datetime' => $this->formatDateTime($logData->timestamp),
-            'extra' => $extra,
-        ];
-    }
-
-    /**
-     * ISO 8601 с микросекундами и таймзоной — формат Monolog по умолчанию ("Y-m-d\TH:i:s.uP").
-     */
-    protected function formatDateTime(float $timestamp): string
-    {
-        $dt = DateTime::createFromFormat('U.u', sprintf('%.6f', $timestamp));
-        if (!$dt) {
-            $dt = new DateTime();
-        }
-        $dt->setTimezone(new DateTimeZone(date_default_timezone_get()));
-        return $dt->format('Y-m-d\TH:i:s.uP');
     }
 
     /**

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xakki\PhpErrorCatcher\connector;
 
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;

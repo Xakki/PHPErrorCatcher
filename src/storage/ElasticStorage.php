@@ -19,13 +19,13 @@ class ElasticStorage extends BaseStorage
     public function __destruct()
     {
         if ($this->owner->needSaveLog()) {
-            if ($this->putData($this->owner->getDataLogsGenerator(), $_SERVER)) {
+            if ($this->putData($this->owner->getDataLogsGenerator())) {
                 $this->owner->successSaveLog();
             }
         }
     }
 
-    // Аккумулируется в PhpErrorCatcher::$logData / $logCached, отправляется bulk в __destruct().
+    // Accumulated in PhpErrorCatcher::$logData / $logCached, sent in bulk in __destruct().
     public function write(LogData $logData): void
     {
     }
@@ -41,10 +41,10 @@ class ElasticStorage extends BaseStorage
     }
 
     /**
-     * @param LogData[] $logsData
+     * @param Generator<LogData> $logsData
      * @return bool
      */
-    protected function putData(Generator $logsData, array $serverData): bool
+    protected function putData(Generator $logsData): bool
     {
         if ($this->file && substr($this->file, 0, 1) == '/') {
             if (!$this->mkdir(dirname($this->file))) {
@@ -53,7 +53,7 @@ class ElasticStorage extends BaseStorage
             foreach ($logsData as $logData) {
                 file_put_contents(
                     $this->file,
-                    Tools::safeJsonEncode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE) . PHP_EOL,
+                    Tools::safeJsonEncode($this->buildRecord($logData), JSON_UNESCAPED_UNICODE) . PHP_EOL,
                     FILE_APPEND
                 );
             }
@@ -69,67 +69,13 @@ class ElasticStorage extends BaseStorage
 //        $meta = '{"index":{}}';
         foreach ($logsData as $logData) {
             $data[] = $meta;
-            $data[] = Tools::safeJsonEncode($this->collectLogData($logData, $serverData), JSON_UNESCAPED_UNICODE);
+            $data[] = Tools::safeJsonEncode($this->buildRecord($logData), JSON_UNESCAPED_UNICODE);
         }
         // . '/' . $this->index . '/' . $this->type
         return $this->sendDataToElastic(implode(PHP_EOL, $data) . PHP_EOL, $this->url . '/_bulk', 'POST');
     }
 
-    public function getParceUserAgent(string $userAgent): array
-    {
-        return [
-            'original' => $userAgent,
-        ];
-    }
-
-    protected function collectLogData(LogData $logData, array $serverData): array
-    {
-        $data = [
-            "@timestamp" => $logData->timestamp,
-            "message" => $logData->message,
-            'level' => $logData->level, // info, notice, warning, error, critical
-            'type' => $logData->type, // exception, trigger, log, fatal
-        ];
-
-        if ($logData->tags) {
-            $data['tags'] = $logData->tags;
-        }
-        if ($logData->fields) {
-            $data['fields'] = $logData->fields;
-        }
-        if ($logData->trace) {
-            $data['trace'] = $logData->trace;
-        }
-        if ($logData->file) {
-            $data['file'] = $logData->file;
-        }
-
-        if (!empty($serverData['REMOTE_ADDR'])) {
-            $data['http']['ip_addr'] = $serverData['REMOTE_ADDR'];
-        }
-        if (!empty($serverData['HTTP_HOST'])) {
-            $data['http']['host'] = $serverData['HTTP_HOST'];
-        }
-        if (!empty($serverData['REQUEST_METHOD'])) {
-            $data['http']['method'] = $serverData['REQUEST_METHOD'];
-        }
-        if (!empty($serverData['REQUEST_URI'])) {
-            $data['http']['url'] = $serverData['REQUEST_URI'];
-        }
-        if (!empty($serverData['HTTP_REFERER'])) {
-            $data['http']['referrer'] = $serverData['HTTP_REFERER'];
-        }
-        if (!empty($serverData['REQUEST_SCHEME'])) {
-            $data['http']['scheme'] = $serverData['REQUEST_SCHEME'];
-        }
-        if (!empty($serverData['HTTP_USER_AGENT'])) {
-            $data['user_agent'] = $this->getParceUserAgent($serverData['HTTP_USER_AGENT']);
-        }
-        if (!empty($serverData['argv'])) {
-            $data['http']['argv'] = $serverData['argv'];
-        }
-        return $data;
-    }
+    // The record uses the same format as StreamStorage — BaseStorage::buildRecord().
 
     public function actionIndexMapping(): string
     {
@@ -150,115 +96,55 @@ class ElasticStorage extends BaseStorage
                         ],
                     ],
                 ],
+                // Structure matches BaseStorage::buildRecord() (Monolog shape):
+                // message / level / level_name / channel / datetime + nested context and extra.
                 "mappings" => [
                     "dynamic_templates" => [
                         [
-                            "fields" => [
-                                "path_match" => "fields.*",
+                            "context_strings" => [
+                                "path_match" => "context.*",
                                 "match_mapping_type" => "string",
-                                "mapping" => [
-                                    "type" => "keyword",
-                                ],
+                                "mapping" => ["type" => "keyword", "ignore_above" => 1024],
+                            ],
+                        ],
+                        [
+                            "extra_strings" => [
+                                "path_match" => "extra.*",
+                                "match_mapping_type" => "string",
+                                "mapping" => ["type" => "keyword", "ignore_above" => 1024],
                             ],
                         ],
                     ],
                     'properties' => [
-                        "@timestamp" => [
-                            "type" => "date",
-                        ],
-                        'level' => ['type' => 'keyword'],
-                        'type' => ['type' => 'keyword'],
-                        "file" => [
-                            "type" => "text",
-                            "norms" => false,
-                        ],
-                        "fields" => [
-                            "properties" => [
-                                "env" => [
-                                    "type" => "keyword",
-                                ],
-                            ],
-                        ],
-                        "tags" => [
-                            "type" => "keyword",
-                            'boost' => 2,
-                        ],
-                        "http" => [
-                            "properties" => [
-                                "ip_addr" => [
-                                    "type" => "ip",
-                                ],
-                                "host" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 128,
-                                ],
-                                "method" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 8,
-                                ],
-                                "url" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 1024,
-                                ],
-                                "referrer" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 1024,
-                                ],
-                                "scheme" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 8,
-                                ],
-                            ],
-                        ],
-                        'user_agent' => [
-                            'properties' => [
-                                "device" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 32,
-                                ],
-                                "name" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 32,
-                                ],
-                                "original" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 256,
-                                    'index' => false,
-                                ],
-                                "os" => [
-                                    "properties" => [
-                                        "full" => [
-                                            "type" => "keyword",
-                                            "ignore_above" => 32,
-                                            'index' => false,
-                                        ],
-                                        "name" => [
-                                            "type" => "keyword",
-                                            "ignore_above" => 16,
-                                        ],
-                                        "version" => [
-                                            "type" => "keyword",
-                                            "ignore_above" => 8,
-                                        ],
-                                    ],
-                                ],
-                                "version" => [
-                                    "type" => "keyword",
-                                    "ignore_above" => 32,
-                                ],
-                            ],
-                        ],
+                        "datetime" => ["type" => "date"],
                         "message" => [
                             "type" => "text",
                             "norms" => false,
                         ],
-                        "trace" => [
-                            "type" => "text",
-                            "norms" => false,
-                            'index' => false,
+                        "level" => ["type" => "integer"],
+                        "level_name" => ["type" => "keyword"],
+                        "channel" => ["type" => "keyword"],
+                        "context" => [
+                            "properties" => [
+                                "remote_ip" => ["type" => "ip"],
+                                "request_host" => ["type" => "keyword", "ignore_above" => 128],
+                                "request_method" => ["type" => "keyword", "ignore_above" => 8],
+                                "request_url" => ["type" => "keyword", "ignore_above" => 1024],
+                                "request_referrer" => ["type" => "keyword", "ignore_above" => 1024],
+                                "request_scheme" => ["type" => "keyword", "ignore_above" => 8],
+                                "request_user_agent" => ["type" => "keyword", "ignore_above" => 512],
+                                "file" => ["type" => "text", "norms" => false],
+                                "trace" => ["type" => "text", "norms" => false, "index" => false],
+                                "log_type" => ["type" => "keyword"],
+                                "log_count" => ["type" => "integer"],
+                                "tags" => ["type" => "keyword"],
+                            ],
                         ],
-                        "count" => [
-                            "type" => "integer",
+                        "extra" => [
+                            "properties" => [
+                                "log_ver" => ["type" => "keyword", "ignore_above" => 16],
+                                "pid" => ["type" => "integer"],
+                            ],
                         ],
                     ],
                 ],
@@ -288,8 +174,8 @@ class ElasticStorage extends BaseStorage
             CURLOPT_POSTFIELDS => $data,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_USERAGENT => 'PhpErrorCatcher v0.2',
-            CURLOPT_HEADER => false, //не включать заголовки ответа сервера в вывод
-            CURLOPT_RETURNTRANSFER => true, //вернуть ответ сервера в виде строки
+            CURLOPT_HEADER => false, //do not include the server response headers in the output
+            CURLOPT_RETURNTRANSFER => true, //return the server response as a string
         ];
         if ($this->auth) {
             $params[CURLOPT_HTTPAUTH] = CURLAUTH_BASIC;
@@ -302,7 +188,7 @@ class ElasticStorage extends BaseStorage
         }
 
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url); //задаём url
+        curl_setopt($ch, CURLOPT_URL, $url); //set the url
         foreach ($params as $k => $r) {
             curl_setopt($ch, $k, $r);
         }

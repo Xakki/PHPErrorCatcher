@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xakki\PhpErrorCatcher\storage;
 
 use Xakki\PhpErrorCatcher\dto\LogData;
@@ -7,12 +9,8 @@ use Xakki\PhpErrorCatcher\PhpErrorCatcher;
 use Xakki\PhpErrorCatcher\Tools;
 
 /**
- * @method string getLogPath()
- * @method string getLogDir()
- * @method string getBackUpDir()
- * @method int getLimitFileSize()
- * @method string getByDir()
- * @method string getByFile()
+ * Sends the log as a UDP datagram in syslog RFC 5424 format; the JSON body is
+ * built by the shared BaseStorage::buildRecord() — same format as StreamStorage.
  */
 class SyslogStorage extends BaseStorage
 {
@@ -23,8 +21,8 @@ class SyslogStorage extends BaseStorage
     protected \Socket $sock;
     protected string $remoteIp = '127.0.0.1';
     protected int $remotePort = 451;
-    protected int $pid;
-    protected string $hostname;
+    protected int $pid = 0;
+    protected string $hostname = '';
     protected int $logSize = 1400;
 
     public function __construct(PhpErrorCatcher $owner, $config = [])
@@ -50,22 +48,8 @@ class SyslogStorage extends BaseStorage
 
     public function write(LogData $logData): void
     {
-        $log = [
-            'ver' => PhpErrorCatcher::VERSION,
-            'message' => $logData->message,
-            'level_name' => $logData->level,
-            'level_php' => $logData->levelInt,
-            'extra' => $this->getDataHttp()->__toArray(),
-            'context' => $logData->fields,
-            'tags' => implode(',', $logData->tags),
-        ];
-        $log['context']['trace'] = $logData->trace;
-        $log['context']['file'] = $logData->file;
-        $log['context']['logType'] = $logData->type;
-        $date = \DateTime::createFromFormat('U.u', (string) $logData->timestamp);
-        $log['context']['timestamp'] = $date ? $date->format('Y-m-d H:i:s.u') : '';
-
-        $log = $this->trimLog($log);
+        // Same record format as StreamStorage (Monolog JsonFormatter shape).
+        $log = $this->trimLog($this->buildRecord($logData));
         //fwrite(STDOUT, $log);
         //syslog($logData->levelInt, $log);
         $priority = $logData->levelInt + $this->syslogFacility;

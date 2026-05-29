@@ -7,5 +7,4 @@ parameters:
     excludePaths:
         - src/connector/
         - src/storage/ElasticStorage.php
-        - src/storage/PdoStorage.php
 
