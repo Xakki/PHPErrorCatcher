@@ -13,12 +13,10 @@ use Xakki\PhpErrorCatcher\storage\FileStorage;
 use Xakki\PhpErrorCatcher\Tools;
 
 /**
- * @method array getErrorListView()
+ * @method mixed[] getErrorListView()
  */
 class FileViewer extends BaseViewer
 {
-    public const VERSION = '0.2';
-
     protected FileStorage $fileStorage;
     /**
      * @var array<string, string>
@@ -97,16 +95,11 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Просмотр логов
+     * Render the logs view
      */
     protected function renderView(): void
     {
-        $url = str_replace([
-            '\\',
-            '\/\/',
-            '\.\/',
-            '\.\.',
-        ], '', $_GET[$this->initGetKey]);
+        $url = Tools::sanitizeRelativePath((string) ($_GET[$this->initGetKey] ?? ''));
 
         $file = trim($url, '/');
 
@@ -143,7 +136,7 @@ class FileViewer extends BaseViewer
         } else {
             if ($file) {
                 $file = rtrim($this->fileStorage->getLogPath(), '/') . '/' . $file;
-                if (!file_exists($file)) {
+                if (!file_exists($file) || !$this->isInsideLogPath($file)) {
                     header('Location: ' . $this->getPreviousUrl());
                     return;
                 } elseif (is_dir($file)) {
@@ -189,7 +182,8 @@ class FileViewer extends BaseViewer
                     $this->renderViewBreadCrumb($url);
 
                     if (!$this->fileStorage->checkIsBackUp($file)) {
-                        echo ' [<a href="' . $_SERVER['REQUEST_URI'] . '&only=1&download=1" class="linkSource">Download</a> <a href="' . $_SERVER['REQUEST_URI'] . '&only=1" class="linkSource">Source</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=do">Бекап</a> <a href="' . $_SERVER['REQUEST_URI'] . '&backup=del">Удалить</a>]';
+                        $reqUri = Tools::escAttr($_SERVER['REQUEST_URI'] ?? '');
+                        echo ' [<a href="' . $reqUri . '&only=1&download=1" class="linkSource">Download</a> <a href="' . $reqUri . '&only=1" class="linkSource">Source</a> <a href="' . $reqUri . '&backup=do">Backup</a> <a href="' . $reqUri . '&backup=del">Delete</a>]';
                     }
                     echo '</h3>';
 
@@ -207,7 +201,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * рендер заголовка HTML
+     * Render the HTML head
      */
     protected function renderViewHead(string $file): void
     {
@@ -215,7 +209,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Просмотр Директории логов
+     * Render the logs directory
      *
      * @param string $path
      * @return array<string, array<int, int|string>>
@@ -276,15 +270,15 @@ class FileViewer extends BaseViewer
                     $size = (int) filesize($filePath);
                     $createTime = (int) filemtime($filePath);
                     $create = date("Y-m-d H:i:s", $createTime);
-                    $size = number_format($size, 0, '', ' ') . ' б.';
+                    $size = number_format($size, 0, '', ' ') . ' B';
                 }
 
                 $tmp = [
-                    '<a href="' . $fileUrl . '" style="' . (is_dir($filePath) ? 'font-weight:bold;' : '') . '">' . $path . '/' . $entry . '</a> ',
+                    '<a href="' . $fileUrl . '" style="' . (is_dir($filePath) ? 'font-weight:bold;' : '') . '">' . Tools::esc($path . '/' . $entry) . '</a> ',
                     $size,
                     $create,
                     ($size ? ' <a href="' . $fileUrl . '&only=1" class="linkSource">Download</a>' : '')
-                    . (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Бекап</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Удалить</a>' : ''),
+                    . (!$isBackUpDir && ($path || !$this->fileStorage->checkIsBackUp($filePath)) ? ' <a href="' . $fileUrl . '&backup=do">Backup</a> <a href="' . $fileUrl . '&backup=del" class="linkDel">Delete</a>' : ''),
                     $createTime,
                 ];
                 // glyphicon glyphicon-hdd
@@ -302,7 +296,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Рендер директории логов
+     * Render the logs directory list
      *
      * @param array<string, array<int, int|string>> $dirList
      * @return void
@@ -326,7 +320,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Делаем бекап фаила и ссылку на него
+     * Back up a file and add a link to it
      */
     protected function renderViewCreateBackUp(string $file): void
     {
@@ -374,13 +368,13 @@ class FileViewer extends BaseViewer
                 }
                 header('Location: ' . $this->getPreviousUrl());
             } else {
-                echo "не удалось переместить $file...\n";
+                echo "failed to move $file...\n";
             }
         }
     }
 
     /**
-     * Бекапи логи
+     * Back up the logs
      */
     protected function renderViewCreateBackUpDir(string $dir): void
     {
@@ -407,7 +401,7 @@ class FileViewer extends BaseViewer
     }
 
     /**
-     * Хлебные крошки
+     * Breadcrumbs
      */
     protected function renderViewBreadCrumb(string $url): void
     {
@@ -418,8 +412,8 @@ class FileViewer extends BaseViewer
         $basePath = $fullPath = $this->getHomeUrl('');
         $ctr = '<li class="breadcrumb-item"><a href="' . $basePath . '">Home</a></li>';
         foreach ($temp as $r) {
-            $fullPath .= '/' . $r;
-            $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . $r . '</a></li>';
+            $fullPath .= '/' . rawurlencode($r);
+            $ctr .= '<li class="breadcrumb-item"><a href="' . $fullPath . '">' . Tools::esc($r) . '</a></li>';
         }
 
         echo '<nav aria-label="breadcrumb"><ol class="breadcrumb">' . $ctr . '</ol></nav>';
@@ -432,6 +426,19 @@ class FileViewer extends BaseViewer
         return '?' . $this->initGetKey . '=/' . implode('/', $temp);
     }
 
+    /**
+     * Defense in depth: the resolved path must lie inside the logs directory.
+     */
+    private function isInsideLogPath(string $path): bool
+    {
+        $base = realpath(rtrim($this->fileStorage->getLogPath(), '/'));
+        $real = realpath($path);
+        if ($base === false || $real === false) {
+            return false;
+        }
+        return $real === $base || str_starts_with($real, $base . DIRECTORY_SEPARATOR);
+    }
+
     /*********************************/
 
     protected function renderFileContent(string $file): void
@@ -442,7 +449,7 @@ class FileViewer extends BaseViewer
         $isImg = getimagesize($file);
         $pathinfo['extension'] = $pathinfo['extension'] ?? '';
         if ($isImg) {
-            echo '<br/><img src="' . $this->owner->getRelativeFilePath($file) . '" alt="' . $pathinfo['basename'] . '" style="max-width:100%;"/>';
+            echo '<br/><img src="' . Tools::escAttr($this->owner->getRelativeFilePath($file)) . '" alt="' . Tools::escAttr($pathinfo['basename']) . '" style="max-width:100%;"/>';
         } elseif ($pathinfo['extension'] == 'html' || isset($_GET['only'])) {
             echo file_get_contents($file);
         } elseif ($pathinfo['extension'] == FileStorage::FILE_EXT) {
@@ -495,23 +502,24 @@ class FileViewer extends BaseViewer
         //        }
         echo '<div class="bugs">';
         if (!empty($httpData->consoleArgv)) {
-            echo '<span class="bugs_uri">console / ' . $httpData->consoleArgv . '</span> ';
+            echo '<span class="bugs_uri">console / ' . Tools::esc($httpData->consoleArgv) . '</span> ';
         } else {
             if (!empty($httpData->method)) {
-                echo '<span class="bugs_uri">' . $httpData->method . '</span> ';
+                echo '<span class="bugs_uri">' . Tools::esc($httpData->method) . '</span> ';
             }
             if (!empty($httpData->url)) {
-                echo '<a class="bugs_uri" target="_blank" href="//' . $httpData->host . $httpData->url . '">' . $httpData->host . $httpData->url . '</a> ';
+                $hostUrl = $httpData->host . $httpData->url;
+                echo '<a class="bugs_uri" target="_blank" href="//' . Tools::escAttr($hostUrl) . '">' . Tools::esc($hostUrl) . '</a> ';
             } elseif (!empty($httpData->host)) {
-                echo '<div class="bugs_uri">' . $httpData->host . '</div> ';
+                echo '<div class="bugs_uri">' . Tools::esc($httpData->host) . '</div> ';
             }
         }
 
         if (!empty($httpData->ipAddr)) {
-            echo '<span class="bugs_ip">' . $httpData->ipAddr . '</span> ';
+            echo '<span class="bugs_ip">' . Tools::esc($httpData->ipAddr) . '</span> ';
         }
         if (!empty($httpData->referrer)) {
-            echo '<span class="bugs_ref">' . $httpData->referrer . '</span> ';
+            echo '<span class="bugs_ref">' . Tools::esc($httpData->referrer) . '</span> ';
         }
         if (!empty($httpData->overMemory)) {
             echo '<span class="bugs_alert">Over memory limit</span> ';
@@ -527,9 +535,9 @@ class FileViewer extends BaseViewer
     public function renderItemLog(LogData $logData): void
     {
         $dt = explode('.', (string)$logData->timestamp);
-        echo '<div class="bug_item bug_level_' . $logData->level . '">'
+        echo '<div class="bug_item bug_level_' . Tools::escAttr($logData->level) . '">'
             . '<span class="bug_time">' . date('H:i:s', (int)$dt[0]) . '.' . $dt[1] . '</span>'
-            . '<span class="bug_type">' . $logData->type . ' : ' . $logData->level . ($logData->count > 1 ? '[' . $logData->count . ']' : '') . '</span>';
+            . '<span class="bug_type">' . Tools::esc($logData->type) . ' : ' . Tools::esc($logData->level) . ($logData->count > 1 ? '[' . $logData->count . ']' : '') . '</span>';
         //(isset($logData->fields[PhpErrorCatcher::FIELD_ERR_CODE]) ? $logData->fields[PhpErrorCatcher::FIELD_ERR_CODE] : E_UNRECONIZE)
         if ($logData->tags) {
             array_walk($logData->tags, function (&$v) {
@@ -538,12 +546,12 @@ class FileViewer extends BaseViewer
             echo '<span class="bug_tags">[' . implode(', ', $logData->tags) . ']</span>';
         }
         if ($logData->fields) {
-            echo '<span class="bug_fields">' . json_encode($logData->fields) . '</span>';
+            echo '<span class="bug_fields">' . Tools::esc($logData->fields) . '</span>';
         }
         if ($logData->file) {
             //        $debug .= '<div class="bug_file"> File <a href="file:/' . $errfile . ':' . $errline . '">' . $errfile . ':' . $errline . '</a></div>';
             $fl = explode(':', $logData->file);
-            echo '<span class="bug_file"> File <a href="' . $this->getFileIdea($fl[0], (int)$fl[1]) . '">' . $logData->file . '</a></span>';
+            echo '<span class="bug_file"> File <a href="' . Tools::escAttr($this->getFileIdea($fl[0], (int)$fl[1])) . '">' . Tools::esc($logData->file) . '</a></span>';
         }
         echo '<div class="bug_str">' . Tools::esc($logData->message) . '</div>';
 
@@ -553,7 +561,7 @@ class FileViewer extends BaseViewer
                 $r = explode('|', $tr);
                 if (isset($r[2])) {
                     [$tFile, $tLine] = explode(':', trim($r[1]));
-                    echo '<div>' . $r[0] . ' <a href="' . $this->getFileIdea($tFile, (int)$tLine) . '">' . $r[2] . '</a></div>';
+                    echo '<div>' . Tools::esc($r[0]) . ' <a href="' . Tools::escAttr($this->getFileIdea($tFile, (int)$tLine)) . '">' . Tools::esc($r[2]) . '</a></div>';
                 } else {
                     echo '<div>' . Tools::esc($tr) . '</div>';
                 }

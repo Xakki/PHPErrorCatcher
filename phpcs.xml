@@ -252,7 +252,7 @@
         <exclude name="WebimpressCodingStandard.Functions.ReturnType.RedundantReturnDoc"/>
     </rule>
     <!--        <rule ref="WebimpressCodingStandard.Commenting.TagWithType">-->
-    <!-- необходимо исключение для шаблонов -->
+    <!-- exclusion needed for templates -->
     <!--            <exclude name="WebimpressCodingStandard.Commenting.TagWithType.InvalidOrder"/>-->
     <!--        </rule>-->
 

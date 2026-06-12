@@ -1,0 +1,27 @@
+services:
+  mariadb:
+    image: mariadb:12
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: pectest
+      MARIADB_USER: pectest
+      MARIADB_PASSWORD: pectest
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: pectest
+      POSTGRES_USER: pectest
+      POSTGRES_PASSWORD: pectest
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pectest -d pectest"]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 10

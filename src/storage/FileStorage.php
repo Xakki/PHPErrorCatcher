@@ -23,7 +23,7 @@ class FileStorage extends BaseStorage
 {
     /* Config */
     protected bool $enableLogging = true;
-    protected int $maxLevelInt = LOG_DEBUG;
+    protected int $minLevelInt = LOG_DEBUG;
     protected string $logPath = '';
     protected string $tplPath = '%Y.%m/%d';
     protected string $logDir = '/logsError';
@@ -34,7 +34,7 @@ class FileStorage extends BaseStorage
     /** @var array<string, int> */
     protected array $logKeys = [];
 
-    public const FILE_EXT = 'plog';
+    public const string FILE_EXT = 'plog';
 
     public function __construct(PhpErrorCatcher $owner, $config = [])
     {
@@ -58,7 +58,7 @@ class FileStorage extends BaseStorage
         if (!$this->enableLogging) {
             return;
         }
-        if ($this->maxLevelInt && $logData->levelInt > $this->maxLevelInt) {
+        if ($this->minLevelInt && $logData->levelInt > $this->minLevelInt) {
             return;
         }
         $this->mkdir($this->getFullLogDir());
@@ -83,6 +83,20 @@ class FileStorage extends BaseStorage
         return rtrim($this->logPath, '/') . '/' . trim($this->logDir, '/') . '/';
     }
 
+    private function formatTplPath(string $tpl): string
+    {
+        $tpl = strtr($tpl, [
+            '%Y' => 'Y',
+            '%y' => 'y',
+            '%m' => 'm',
+            '%d' => 'd',
+            '%H' => 'H',
+            '%M' => 'i',
+            '%S' => 's',
+        ]);
+        return date($tpl);
+    }
+
     private function finishSave(): void
     {
         if (!file_exists($this->tmpFile)) {
@@ -92,7 +106,7 @@ class FileStorage extends BaseStorage
         if ($lastSlash === false) {
             $lastSlash = strlen($this->tplPath);
         }
-        $fileName = strftime(substr($this->tplPath, 0, $lastSlash));
+        $fileName = $this->formatTplPath(substr($this->tplPath, 0, $lastSlash));
 
         $fileName = $this->getFullLogDir() . $fileName;
 
@@ -104,7 +118,7 @@ class FileStorage extends BaseStorage
         }
 
         $suffix = substr($this->tplPath, $lastSlash);
-        $fileName = $fileName . '/' . trim((string) strftime($suffix), '/');
+        $fileName = $fileName . '/' . trim($this->formatTplPath($suffix), '/');
         $maxLevel = $this->owner->getHighLevelLogs();
         if ($maxLevel) {
             $fileName .= '.' . $maxLevel;

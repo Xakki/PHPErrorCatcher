@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Xakki\PhpErrorCatcher\PhpErrorCatcher;
+use Xakki\PhpErrorCatcher\Tools;
 use Xakki\PhpErrorCatcher\viewer\FileViewer;
 
 /**
@@ -21,7 +22,7 @@ $tabs = [
 ?>
 <html>
 <head>
-    <title>LogView<?= $file ? ':' . $file : '' ?></title>
+    <title>LogView<?= $file ? ':' . Tools::esc($file) : '' ?></title>
     <meta http-equiv="Cache-Control" content="no-cache">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -56,7 +57,7 @@ $tabs = [
 
         $(document).ready(function () {
             $('.linkDel').on('click', function () {
-                if (confirm('Удалить?'))
+                if (confirm('Delete?'))
                     return true;
                 return false;
             });
@@ -72,7 +73,7 @@ $tabs = [
 <body>
 
 <ul class="nav nav-tabs">
-    <li class="nav-item"><a class="nav-link<?=!isset($tabs[$file]) ? ' active' : ''?>" href="<?=$home?>/">Логи</a></li>
+    <li class="nav-item"><a class="nav-link<?=!isset($tabs[$file]) ? ' active' : ''?>" href="<?=$home?>/">Logs</a></li>
 
     <?php if (file_exists($this->getOwner()->getRawLogFile())) : ?>
         <li class="nav-item"><a class="text-danger nav-link<?=$file == 'rawlog' ? ' active' : ''?>" href="<?=$home?>rawlog">Errors</a></li>
@@ -88,5 +89,5 @@ $tabs = [
     <?php foreach ($this->extraLinks as $name => $url) : ?>
         <li class="nav-item"><a class="nav-link" href="<?=$url?>" target="_blank"><?=$name?></a></li>
     <?php endforeach; ?>
-    <li class="nav-item"><a class="nav-link">Core ver: <?=PhpErrorCatcher::VERSION?>. Viewer ver: <?=FileViewer::VERSION?></a></li>
+    <li class="nav-item"><a class="nav-link">Core ver: <?=PhpErrorCatcher::VERSION?></a></li>
 </ul>

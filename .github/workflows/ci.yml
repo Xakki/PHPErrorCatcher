@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3']
+        php: ['8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +22,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: mbstring, json, curl, pdo, sockets
+          extensions: mbstring, json, curl, pdo, pdo_sqlite, sockets
           coverage: none
           tools: composer:v2
 
@@ -55,8 +55,8 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mbstring, json, curl, pdo, sockets
+          php-version: '8.3'
+          extensions: mbstring, json, curl, pdo, pdo_sqlite, sockets
           coverage: none
           tools: composer:v2
 
@@ -81,16 +81,20 @@ jobs:
         run: exit 1
 
   phpstan:
-    name: PHPStan
+    name: PHPStan (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: mbstring, json, curl, pdo, sockets
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, json, curl, pdo, pdo_sqlite, sockets
           coverage: none
           tools: composer:v2
 
@@ -99,3 +103,73 @@ jobs:
 
       - name: Run phpstan
         run: vendor/bin/phpstan analyse --memory-limit 1G
+
+  db-tests:
+    name: PHPUnit DB (mariadb + postgres)
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:12
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: pectest
+          MARIADB_USER: pectest
+          MARIADB_PASSWORD: pectest
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=10s
+
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: pectest
+          POSTGRES_USER: pectest
+          POSTGRES_PASSWORD: pectest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U pectest -d pectest"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=10s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, json, curl, pdo, pdo_mysql, pdo_pgsql, pdo_sqlite, sockets
+          coverage: none
+          tools: composer:v2
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-8.3-${{ hashFiles('composer.json') }}
+          restore-keys: composer-8.3-
+
+      - name: Install dependencies
+        run: composer update --no-progress --no-interaction --prefer-dist
+
+      - name: Run PHPUnit (PdoStorage, all engines)
+        env:
+          PEC_TEST_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=pectest"
+          PEC_TEST_MYSQL_USER: pectest
+          PEC_TEST_MYSQL_PASS: pectest
+          PEC_TEST_PGSQL_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=pectest"
+          PEC_TEST_PGSQL_USER: pectest
+          PEC_TEST_PGSQL_PASS: pectest
+        run: vendor/bin/phpunit --colors=always --filter=PdoStorage

@@ -8,7 +8,7 @@ use Exception;
 
 class Tools
 {
-    public const COLOR_GREEN = '0;32',
+    public const string COLOR_GREEN = '0;32',
         COLOR_GRAY = '0;37',
         COLOR_GRAY2 = '1;37',
         COLOR_YELLOW = '1;33',
@@ -275,9 +275,8 @@ class Tools
 
     public static function prepareTag(string $tag): string
     {
-        $tag = (string)$tag;
         if (mb_strlen($tag) > 32) {
-            $tag = mb_substr($tag, 29) . '...';
+            $tag = mb_substr($tag, 0, 29) . '...';
         }
         return mb_strtolower($tag);
     }
@@ -291,7 +290,7 @@ class Tools
         array_walk($tags, function (&$v) {
             $v = self::prepareTag($v);
         });
-        return $tags;
+        return array_filter($tags);
     }
 
     /**
@@ -330,7 +329,7 @@ class Tools
     }
 
     /**
-     * Экранирование
+     * HTML-escape a value
      *
      * @param mixed $value
      * @return string
@@ -345,7 +344,40 @@ class Tools
     }
 
     /**
-     * Рекурсивно удаляем директорию
+     * Escape a value for an HTML attribute (href/src/class…): unlike esc() it
+     * also escapes quotes (ENT_QUOTES) so the value cannot "break out" of the
+     * attribute.
+     *
+     * @param mixed $value
+     * @throws Exception
+     */
+    public static function escAttr(mixed $value): string
+    {
+        if (!is_string($value)) {
+            $value = self::safeJsonEncode($value, JSON_UNESCAPED_UNICODE);
+        }
+        return htmlspecialchars($value, ENT_QUOTES | ENT_IGNORE, 'utf-8');
+    }
+
+    /**
+     * Normalizes a relative path from untrusted input: drops '.', '..' and empty
+     * segments, normalizes slashes. The result cannot escape the base directory —
+     * protection against path traversal (LFI/deletion/rename).
+     */
+    public static function sanitizeRelativePath(string $path): string
+    {
+        $parts = [];
+        foreach (explode('/', str_replace('\\', '/', $path)) as $segment) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
+                continue;
+            }
+            $parts[] = $segment;
+        }
+        return implode('/', $parts);
+    }
+
+    /**
+     * Recursively delete a directory
      */
     public static function delTree(string $dir): bool
     {

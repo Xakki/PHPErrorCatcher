@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Xakki\PhpErrorCatcher\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Xakki\PhpErrorCatcher\dto\LogData;
@@ -29,7 +30,6 @@ class StreamStorageTest extends TestCase
         $this->owner = $ref->newInstanceWithoutConstructor();
 
         $prop = $ref->getProperty('obj');
-        $prop->setAccessible(true);
         $prop->setValue(null, $this->owner);
     }
 
@@ -63,6 +63,7 @@ class StreamStorageTest extends TestCase
             'trace' => '#0 /app/x.php(10)',
             'file' => '/app/x.php:10',
             'fields' => ['tag' => 'payments', 'extra_field' => 'v'],
+            'tags' => ['payments', 'api'],
             'timestamp' => 1714210000.123456,
             'count' => 1,
         ]);
@@ -97,7 +98,8 @@ class StreamStorageTest extends TestCase
         $this->assertCount(1, $records);
         $rec = $records[0];
 
-        $this->assertSame(
+        // Monolog JsonFormatter: exactly 7 top-level keys (order does not matter).
+        $this->assertEqualsCanonicalizing(
             ['message', 'context', 'level', 'level_name', 'channel', 'datetime', 'extra'],
             array_keys($rec)
         );
@@ -105,15 +107,21 @@ class StreamStorageTest extends TestCase
         $this->assertSame(400, $rec['level']);
         $this->assertSame('ERROR', $rec['level_name']);
         $this->assertSame('php', $rec['channel']);
+
+        // Custom fields live in context (the Monolog way), not at the root.
         $this->assertSame('payments', $rec['context']['tag']);
         $this->assertSame('v', $rec['context']['extra_field']);
         $this->assertSame('logger', $rec['context']['log_type']);
+        $this->assertSame(1, $rec['context']['log_count']);
+        $this->assertSame('payments,api', $rec['context']['tags']);
         $this->assertSame('/app/x.php:10', $rec['context']['file']);
-        $this->assertSame('k1', $rec['context']['log_key']);
         $this->assertArrayHasKey('trace', $rec['context']);
-        $this->assertArrayHasKey('hostname', $rec['extra']);
+        // http data also goes into context.
+        $this->assertArrayHasKey('remote_ip', $rec['context']);
+
+        // extra — process/environment data.
         $this->assertArrayHasKey('pid', $rec['extra']);
-        $this->assertSame(PhpErrorCatcher::VERSION, $rec['extra']['ver']);
+        $this->assertSame(PhpErrorCatcher::VERSION, $rec['extra']['log_ver']);
     }
 
     public function testDatetimeIsIso8601WithMicroseconds(): void
@@ -147,9 +155,7 @@ class StreamStorageTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider levelMappingProvider
-     */
+    #[DataProvider('levelMappingProvider')]
     public function testSyslogToMonologLevelMapping(int $syslog, int $expectedLevel, string $expectedName): void
     {
         $storage = $this->makeStorage();

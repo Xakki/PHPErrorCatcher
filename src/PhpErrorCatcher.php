@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Xakki\PhpErrorCatcher;
 
 use DateTime;
@@ -17,9 +19,9 @@ use const STDOUT;
 
 class PhpErrorCatcher implements LoggerInterface
 {
-    public const VERSION = '0.8.1';
+    public const string VERSION = '0.8.3';
 
-    public const LEVEL_DEBUG = 'debug',
+    public const string LEVEL_DEBUG = 'debug',
         LEVEL_TIME = 'time',
         LEVEL_INFO = 'info',
         LEVEL_NOTICE = 'notice',
@@ -28,19 +30,19 @@ class PhpErrorCatcher implements LoggerInterface
         LEVEL_CRITICAL = 'critical',
         LEVEL_ALERT = 'alert';
 
-    public const TYPE_LOGGER = 'logger',
+    public const string TYPE_LOGGER = 'logger',
         TYPE_TRIGGER = 'trigger',
         TYPE_EXCEPTION = 'exception',
         TYPE_FATAL = 'fatal';
 
-    public const FIELD_LOG_TYPE = 'log_type',
+    public const string FIELD_LOG_TYPE = 'log_type',
         FIELD_FILE = 'file',
         FIELD_TRACE = 'trace',
         FIELD_NO_TRACE = 'trace_no_fake',
         FIELD_ERR_CODE = 'error_code',
         FIELD_EXC_CODE = 'exception_code';
 
-    protected const LOG_FIELDS = [
+    protected const array LOG_FIELDS = [
         self::FIELD_LOG_TYPE,
         self::FIELD_FILE,
         self::FIELD_TRACE,
@@ -68,7 +70,7 @@ class PhpErrorCatcher implements LoggerInterface
         E_RECOVERABLE_ERROR => self::LEVEL_ERROR,
     ];
 
-    public const CLI_LEVEL_COLOR = [
+    public const array CLI_LEVEL_COLOR = [
         self::LEVEL_ALERT => Tools::COLOR_RED,
         self::LEVEL_CRITICAL => Tools::COLOR_RED,
         self::LEVEL_ERROR => Tools::COLOR_RED,
@@ -80,7 +82,7 @@ class PhpErrorCatcher implements LoggerInterface
     ];
 
     /** @var string[] */
-    protected static $logLevel = [
+    protected static array $logLevel = [
         LOG_EMERG => self::LEVEL_ALERT,
         LOG_ALERT => self::LEVEL_ALERT,
         LOG_CRIT => self::LEVEL_CRITICAL,
@@ -91,15 +93,29 @@ class PhpErrorCatcher implements LoggerInterface
         LOG_DEBUG => self::LEVEL_DEBUG,
     ];
 
+    /**
+     * @var array<string, int>
+     */
+    protected static array $levelToSyslog = [
+        self::LEVEL_ALERT => LOG_ALERT,
+        self::LEVEL_CRITICAL => LOG_CRIT,
+        self::LEVEL_ERROR => LOG_ERR,
+        self::LEVEL_WARNING => LOG_WARNING,
+        self::LEVEL_NOTICE => LOG_NOTICE,
+        self::LEVEL_INFO => LOG_INFO,
+        self::LEVEL_TIME => LOG_INFO,
+        self::LEVEL_DEBUG => LOG_DEBUG,
+    ];
+
     /************************************/
     // Config
     /************************************/
 
     protected static string $dirRoot = '';
     public static bool $debugMode = false;//ERROR_DEBUG_MODE
-    public static bool $traceShowArgs = true;
+    public static bool $traceShowArgs = false;
 
-    protected bool $logTimeProfiler = false;// time execute log
+    protected static bool $logTimeProfiler = false;// time execute log
     protected static string $logCookieKey = '';
     protected static int $limitTrace = 10;
     protected static int $maxLenMessage = 5000;
@@ -159,9 +175,9 @@ class PhpErrorCatcher implements LoggerInterface
     protected static int $cacheLifeTime = 600;
     protected static bool $saveLogIfHasError = false;
 
-    // Защита от лавины: после `$maxLogsPerRequest` запись лога дропается;
-    // на первом превышении пишется одиночное предупреждение в STDERR.
-    // 0 — лимит выключен.
+    // Flood guard: once `$maxLogsPerRequest` is reached further logs are dropped;
+    // a single warning is written to STDERR on the first overflow.
+    // 0 — limit disabled.
     protected static int $maxLogsPerRequest = 100;
 
     /************************************/
@@ -215,10 +231,10 @@ class PhpErrorCatcher implements LoggerInterface
         self::LEVEL_WARNING => 1,
     ];
 
-    protected static self $obj;
+    protected static ?self $obj = null;
 
     /**
-     * Initialization
+     * @deprecated Use `new PhpErrorCatcher(storage: [...])` instead.
      *
      * @param mixed[] $config
      * @return self
@@ -226,50 +242,147 @@ class PhpErrorCatcher implements LoggerInterface
      */
     public static function init(array $config = []): self
     {
-        if (empty(static::$obj)) {
-            // @phpstan-ignore-next-line
-            static::$obj = new static($config);
+        if (static::$obj !== null) {
+            return static::$obj;
         }
-        return static::$obj;
+
+        // Map only known keys to avoid "unknown named argument" fatal on stale configs.
+        $known = [
+            'storage',
+            'plugin',
+            'viewer',
+            'dirRoot',
+            'debugMode',
+            'traceShowArgs',
+            'logTimeProfiler',
+            'logCookieKey',
+            'limitTrace',
+            'maxLenMessage',
+            'logTags',
+            'logFields',
+            'logTraceByLevel',
+            'ignoreRules',
+            'stopRules',
+            'printHttpRules',
+            'printConsoleRules',
+            'cacheLifeTime',
+            'saveLogIfHasError',
+            'maxLogsPerRequest',
+        ];
+        $args = array_intersect_key($config, array_flip($known));
+
+        // @phpstan-ignore new.static
+        return new static(...$args);
     }
 
     /**
-     * @param mixed[] $config
+     * @param array<mixed>                                           $storage         Storage backend configs (required).
+     * @param array<mixed>|null                                      $plugin          Plugin configs.
+     * @param array<mixed>|null                                      $viewer          Viewer config.
+     * @param string|null                                            $dirRoot         Project root for relative paths.
+     * @param bool|null                                              $debugMode       Echo errors instead of swallowing.
+     * @param bool|null                                              $traceShowArgs   Include args in backtraces.
+     * @param bool|null                                              $logTimeProfiler Log request execution time.
+     * @param string|null                                            $logCookieKey    Cookie name that enables logging.
+     * @param int|null                                               $limitTrace      Max backtrace depth.
+     * @param int|null                                               $maxLenMessage   Truncate messages at this length.
+     * @param string[]|null                                          $logTags         Default tags on every log entry.
+     * @param array<string, string|int|float|bool>|null             $logFields       Default fields on every log entry.
+     * @param array<string, int>|null                                $logTraceByLevel Per-level trace depth override.
+     * @param array<array{level:string,type:string}>|null           $ignoreRules     Entries matching these are dropped.
+     * @param array<array{level:string,type:string}>|null           $stopRules       Entries matching these halt logging.
+     * @param array<array{level:string}>|null                       $printHttpRules  Which levels echo to HTTP response.
+     * @param array<array{level:string}>|null                       $printConsoleRules Which levels echo to STDERR.
+     * @param int|null                                               $cacheLifeTime   Log cache TTL in seconds.
+     * @param bool|null                                              $saveLogIfHasError Only persist when errors occurred.
+     * @param int|null                                               $maxLogsPerRequest Drop entries after this many per request (0 = unlimited).
      * @throws Throwable
      */
-    protected function __construct(array $config = [])
-    {
+    public function __construct(
+        array $storage,
+        ?array $plugin = null,
+        ?array $viewer = null,
+        ?string $dirRoot = null,
+        ?bool $debugMode = null,
+        ?bool $traceShowArgs = null,
+        ?bool $logTimeProfiler = null,
+        ?string $logCookieKey = null,
+        ?int $limitTrace = null,
+        ?int $maxLenMessage = null,
+        ?array $logTags = null,
+        ?array $logFields = null,
+        ?array $logTraceByLevel = null,
+        ?array $ignoreRules = null,
+        ?array $stopRules = null,
+        ?array $printHttpRules = null,
+        ?array $printConsoleRules = null,
+        ?int $cacheLifeTime = null,
+        ?bool $saveLogIfHasError = null,
+        ?int $maxLogsPerRequest = null,
+    ) {
         $this->timeStart = microtime(true);
 
         if (!static::$dirRoot) {
-            static::$dirRoot = $_SERVER['DOCUMENT_ROOT'];
+            static::$dirRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
         }
         if (ini_get('max_execution_time')) {
             self::$cacheLifeTime = (int) ini_get('max_execution_time') * 2;
         }
 
+        // Apply nullable config args — only override the static default when explicitly supplied.
+        if ($dirRoot !== null) {
+            static::$dirRoot = $dirRoot;
+        }
+        if ($debugMode !== null) {
+            static::$debugMode = $debugMode;
+        }
+        if ($traceShowArgs !== null) {
+            static::$traceShowArgs = $traceShowArgs;
+        }
+        if ($logTimeProfiler !== null) {
+            static::$logTimeProfiler = $logTimeProfiler;
+        }
+        if ($logCookieKey !== null) {
+            static::$logCookieKey = $logCookieKey;
+        }
+        if ($limitTrace !== null) {
+            static::$limitTrace = $limitTrace;
+        }
+        if ($maxLenMessage !== null) {
+            static::$maxLenMessage = $maxLenMessage;
+        }
+        if ($logTags !== null) {
+            static::$logTags = $logTags;
+        }
+        if ($logFields !== null) {
+            static::$logFields = $logFields;
+        }
+        if ($logTraceByLevel !== null) {
+            static::$logTraceByLevel = $logTraceByLevel;
+        }
+        if ($ignoreRules !== null) {
+            static::$ignoreRules = $ignoreRules;
+        }
+        if ($stopRules !== null) {
+            static::$stopRules = $stopRules;
+        }
+        if ($printHttpRules !== null) {
+            static::$printHttpRules = $printHttpRules;
+        }
+        if ($printConsoleRules !== null) {
+            static::$printConsoleRules = $printConsoleRules;
+        }
+        if ($cacheLifeTime !== null) {
+            static::$cacheLifeTime = $cacheLifeTime;
+        }
+        if ($saveLogIfHasError !== null) {
+            static::$saveLogIfHasError = $saveLogIfHasError;
+        }
+        if ($maxLogsPerRequest !== null) {
+            static::$maxLogsPerRequest = $maxLogsPerRequest;
+        }
+
         try {
-            if (empty($config['storage'])) {
-                throw new Exception('Storages config is require');
-            }
-
-            $storage = $config['storage'];
-            unset($config['storage']);
-
-            $viewer = null;
-            if (!empty($config['viewer'])) {
-                $viewer = $config['viewer'];
-                unset($config['viewer']);
-            }
-
-            $plugin = null;
-            if (!empty($config['plugin'])) {
-                $plugin = $config['plugin'];
-                unset($config['plugin']);
-            }
-
-            $this->applyConfig($config);
-
             $this->initStorage($storage);
 
             if ($plugin) {
@@ -294,6 +407,13 @@ class PhpErrorCatcher implements LoggerInterface
                 $this,
                 'handleException',
             ]);
+
+            // Register the singleton only after successful construction, so a
+            // throwing init (e.g. bad storage) leaves $obj null and a retry works.
+            if (static::$obj !== null && static::$debugMode) {
+                trigger_error('PhpErrorCatcher: overwriting existing instance', E_USER_WARNING);
+            }
+            static::$obj = $this;
         } catch (Throwable $e) {
             if (static::$debugMode) {
                 echo 'Cant init logger: ' . $e->__toString();
@@ -304,16 +424,19 @@ class PhpErrorCatcher implements LoggerInterface
         }
     }
 
-    private function __clone()
+    private function __clone(): void
     {
     }
 
-    final public function __serialize()
+    /**
+     * @return array<string, mixed>
+     */
+    final public function __serialize(): array
     {
         return [];
     }
 
-    final public function __wakeup()
+    final public function __wakeup(): void
     {
     }
 
@@ -330,7 +453,9 @@ class PhpErrorCatcher implements LoggerInterface
     protected function applyConfig(array $config): void
     {
         foreach ($config as $key => $value) {
-            if (property_exists($this, $key)) {
+            // Config sets static properties only (shared across all instances).
+            // Instance properties are runtime state and are not configurable.
+            if (property_exists(static::class, $key)) {
                 static::${$key} = $value;
             }
         }
@@ -416,7 +541,7 @@ class PhpErrorCatcher implements LoggerInterface
             $this->log(self::$triggerLevel[$error['type']], $error['message'], $context);
         }
 
-        if ($this->logTimeProfiler) {
+        if (self::$logTimeProfiler) {
             $this->log(self::LEVEL_TIME, (string) $this->timeEnd, ['execution']);
         }
     }
@@ -439,7 +564,7 @@ class PhpErrorCatcher implements LoggerInterface
     }
 
     /**
-     * Обработчик триггерных ошибок
+     * Handler for triggered errors (set_error_handler).
      *
      * @param int        $errno
      * @param string     $errstr
@@ -452,12 +577,12 @@ class PhpErrorCatcher implements LoggerInterface
     public function handleTrigger(int $errno, string $errstr, string $errfile, int $errline, ?array $vars = null): bool
     {
         if (!(error_reporting() & $errno)) {
-            // также игнорируются ошибки помеченные @
+            // also skips errors suppressed with @
             return true;
         }
 
-        // Снимаем стек прямо в обработчике, чтобы он указывал на точку ошибки,
-        // а не на фреймы внутри PhpErrorCatcher::log()/createLogData().
+        // Capture the stack right here so it points at the error site, not at
+        // frames inside PhpErrorCatcher::log()/createLogData().
         $trace = debug_backtrace(
             static::$traceShowArgs ? DEBUG_BACKTRACE_PROVIDE_OBJECT : DEBUG_BACKTRACE_IGNORE_ARGS,
             static::$limitTrace + 1
@@ -475,7 +600,7 @@ class PhpErrorCatcher implements LoggerInterface
             error_clear_last();
         }
 
-        return true; /* Не запускаем внутренний обработчик ошибок PHP */
+        return true; /* Do not run PHP's internal error handler */
     }
 
     /****************************************************/
@@ -624,7 +749,7 @@ class PhpErrorCatcher implements LoggerInterface
         [$tags, $fields] = $this->collectTagsAndFields($context);
 
         if (is_object($message)) {
-            // если это эксепшн и другие подобные объекты
+            // an exception or another object-like message
             [$message, $fields2] = $this->getLogFromObject($message);
             if ($fields2) {
                 $fields = array_merge($fields, $fields2);
@@ -634,13 +759,11 @@ class PhpErrorCatcher implements LoggerInterface
         $logData = new LogData();
         $logData->message = Tools::prepareMessage($message, self::$maxLenMessage);
         $logData->level = $level;
-        // levelInt — это syslog-приоритет (LOG_*), его потребляют storages
+        // levelInt — syslog priority (LOG_*) consumed by the storages
         // (StreamStorage::$monologLevel, SyslogStorage facility, Stream/FileStorage
-        // фильтры) как syslog. Раньше искали в $triggerLevel (ключи = E_*),
-        // E_*/LOG_* пересекаются (E_WARNING=2==LOG_CRIT=2, E_ERROR=1==LOG_ALERT=1)
-        // → warning логировался как CRITICAL, error как ALERT и т.д. Ищем в
-        // $logLevel (ключи = LOG_*).
-        $logData->levelInt = (int) array_search($logData->level, self::$logLevel);
+        // filters). Taken from the explicit $levelToSyslog map; an unknown level →
+        // LOG_DEBUG (not 0/EMERGENCY, as the old array_search over $logLevel gave).
+        $logData->levelInt = self::$levelToSyslog[$logData->level] ?? LOG_DEBUG;
         $logData->type = $fields[self::FIELD_LOG_TYPE];
 
         if (isset($context[self::FIELD_TRACE])) {
@@ -708,8 +831,8 @@ class PhpErrorCatcher implements LoggerInterface
             }
         }
 
-        // В режиме startCatchLog() — только помечаем ключи, в storage не пишем
-        // (логи будут возвращены через endCatchLog()).
+        // In startCatchLog() mode — only mark the keys, do not write to storage
+        // (the logs are returned via endCatchLog()).
         if (self::$userCatchLogFlag) {
             self::$userCatchLogKeys[$key] = true;
         } else {
@@ -766,9 +889,9 @@ class PhpErrorCatcher implements LoggerInterface
         $output .= PHP_EOL . "\t" . str_replace(PHP_EOL, "\n\t", Tools::cliColor($logData->message, Tools::COLOR_GRAY2)) . PHP_EOL;
 
         if (isset($_SERVER['TERM'])) {
-            fwrite(STDERR, $output); // Ошибки в консоли можно залогировать толкьо так `&2 >>`
+            fwrite(STDERR, $output); // errors can only be captured in a terminal via `2>>`
         } else {
-            // Для кронов, чтобы все логи по умолчанию выводились дефолтно черезе `>>`
+            // for cron jobs, so all logs go to the default output via `>>`
             fwrite(STDOUT, $output);
         }
     }
@@ -856,12 +979,14 @@ class PhpErrorCatcher implements LoggerInterface
 
     public static function getErrCount(): int
     {
-        return static::$obj->errCount;
+        return static::$obj !== null ? static::$obj->errCount : 0;
     }
 
     public static function startCatchLog(): void
     {
-        if (self::$userCatchLogFlag) return;
+        if (self::$userCatchLogFlag) {
+            return;
+        }
         self::$userCatchLogFlag = true;
         self::$userCatchLogKeys = [];
     }
@@ -996,6 +1121,9 @@ class PhpErrorCatcher implements LoggerInterface
     {
         $tags = $fields = [];
         foreach ($context as $k => $v) {
+            if (is_null($v) || $v === '') {
+                continue;
+            }
             if (is_numeric($k)) {
                 $tags[] = $v;
             } else {
@@ -1004,8 +1132,8 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         if (static::$logCookieKey && !empty($_COOKIE[static::$logCookieKey])) {
-            // Для поиска нужных логов внешней индексацией — пишем как поле,
-            // а не тег, чтобы попадало в context/fields у storage'ей (Stream/Elastic).
+            // Written as a field (not a tag) so external indexing can find these
+            // logs — it lands in the storages' context/fields (Stream/Elastic).
             $fields['logCookieKey'] = $_COOKIE[static::$logCookieKey];
         }
 
@@ -1110,8 +1238,8 @@ class PhpErrorCatcher implements LoggerInterface
         }
 
         if (static::$maxLogsPerRequest > 0 && $this->count >= static::$maxLogsPerRequest) {
-            // createLogData() обычно инкрементит $count — здесь его нет,
-            // считаем сами, иначе никогда не словим "ровно граничный" момент.
+            // createLogData() normally increments $count, but it is not called
+            // here — count manually, otherwise we never catch the exact boundary.
             $this->count++;
             if ($this->count === static::$maxLogsPerRequest + 1) {
                 fwrite(
