@@ -1,9 +1,10 @@
 # PHPErrorCatcher
 
 Logger for all PHP & JS errors (PSR-3), with pluggable storage backends.
-Requires **PHP 8.3+**. Full runnable example: [`example/test.php`](example/test.php).
+Requires **PHP 8.3+**. Full runnable example:
+[`example/test.php`](https://github.com/Xakki/PHPErrorCatcher/blob/master/example/test.php).
 
-📖 **[Documentation site](https://xakki.github.io/phperrorcatcher/)**
+📖 **[Documentation site](https://xakki.github.io/PHPErrorCatcher/)**
 
 ## Install
 

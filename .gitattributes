@@ -1,4 +1,17 @@
 .git/ export-ignore
 .idea/ export-ignore
+.github/ export-ignore
 package/ export-ignore
 tests/ export-ignore
+assets/ export-ignore
+_includes/ export-ignore
+_layouts/ export-ignore
+compose.test.yml export-ignore
+Dockerfile export-ignore
+Makefile export-ignore
+_config.yml export-ignore
+phpcs.xml export-ignore
+phpstan.neon export-ignore
+phpunit.xml.dist export-ignore
+CHANGELOG.md export-ignore
+CLAUDE.md export-ignore
