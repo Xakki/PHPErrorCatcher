@@ -633,6 +633,11 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         if (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
             return true;
         }
+        foreach (headers_list() as $header) {
+            if (strpos($header, 'Content-Type:') !== false && strpos($header, 'application/json') !== false) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -755,8 +760,16 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         $fields = [];
         $mess = get_class($object);
 
+        // §6.1: structured exception FQN, mirrors laralog's LogManager::appendContext()
+        $fields['exception'] = get_class($object);
+
         if (method_exists($object, 'getCode')) {
-            $fields['exception_code'] = $object->getCode();
+            // Cast: PDOException::getCode() returns a SQLSTATE string ('42S02'),
+            // not int like the base Exception — an uncast value here would let
+            // this field flip type between records and get the whole document
+            // rejected by OpenSearch (the same failure class this field exists
+            // to avoid).
+            $fields['exception_code'] = (int) $object->getCode();
         }
 
         if (method_exists($object, 'getMessage') && $object->getMessage()) {
@@ -767,15 +780,35 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
             $mess .= get_class($object);
         }
 
-        if (method_exists($object, 'getPrevious') && $object->getPrevious()) {
-            $mess .= PHP_EOL . 'Prev: ' . $object->getPrevious()->getMessage();
-        }
         if (method_exists($object, 'getFile')) {
             $fields[self::FIELD_FILE] = $this->getRelativeFilePath($object->getFile()) . ':' . $object->getLine();
         }
 
         if (method_exists($object, 'getTrace')) {
             $fields[self::FIELD_TRACE] = $this->renderDebugTrace($object->getTrace(), 0, $this->limitTrace);
+        }
+
+        if (method_exists($object, 'getPrevious') && $object->getPrevious()) {
+            $prev = $object->getPrevious();
+            $mess .= PHP_EOL . 'Prev: ' . $prev->getMessage();
+
+            // §6.1 previous-exception chain, structured (not just free-text).
+            $fields['exception_prev'] = get_class($prev);
+            // Same 8000-char cap as the primary non-debug message (see log() below):
+            // an uncapped previous message (large query text, dumped payload) can
+            // exceed Lucene's 32766-byte term limit and get the document rejected.
+            $fields['exception_prev_message'] = mb_substr($prev->getMessage(), 0, 8000);
+            if (method_exists($prev, 'getFile')) {
+                $fields['exception_prev_file'] = $this->getRelativeFilePath($prev->getFile()) . ':' . $prev->getLine();
+            }
+            if (method_exists($prev, 'getCode')) {
+                // See the cast note on exception_code above — PDOException::getCode()
+                // returns a SQLSTATE string, not int.
+                $fields['exception_prev_code'] = (int) $prev->getCode();
+            }
+            if (method_exists($prev, 'getTrace')) {
+                $fields['exception_prev_trace'] = $this->renderDebugTrace($prev->getTrace(), 0, $this->limitTrace);
+            }
         }
 
         return [$mess, $fields];
