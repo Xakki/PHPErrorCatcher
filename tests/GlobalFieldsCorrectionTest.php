@@ -27,7 +27,8 @@ class CapturingCatcher extends PhpErrorCatcher
  * context AFTER the corrector call at the top of log(), so they used to bypass it.
  * The motivating production defect: addGlobalField('smq_id', $row['smq_id']) hands over
  * a PHP 5.6 DB string while direct log() call sites pass int / null — three json types
- * for one OpenSearch field, and the whole document gets rejected.
+ * for one OpenSearch field, and the whole document gets rejected. With 'id' an int word
+ * all three converge on int (null stays null).
  */
 class GlobalFieldsCorrectionTest extends TestCase
 {
@@ -76,13 +77,13 @@ class GlobalFieldsCorrectionTest extends TestCase
         return $prop->getValue($this->catcher);
     }
 
-    public function testGlobalIdIsCorrectedToString()
+    public function testGlobalIdIsCorrectedToInt()
     {
-        PhpErrorCatcher::addGlobalField('smq_id', 2921172);
+        PhpErrorCatcher::addGlobalField('smq_id', '2921172');
         $this->catcher->error('boom');
 
         $fields = $this->lastFields();
-        $this->assertSame('2921172', $fields['smq_id']);
+        $this->assertSame(2921172, $fields['smq_id']);
     }
 
     /**
@@ -91,7 +92,7 @@ class GlobalFieldsCorrectionTest extends TestCase
     public function testGlobalIdConvergesAcrossCallSites()
     {
         $inputs = array('2921172', 2921172, 0, null);
-        $expected = array('2921172', '2921172', '0', null);
+        $expected = array(2921172, 2921172, 0, null);
 
         foreach ($inputs as $i => $input) {
             $ref = new ReflectionClass('Xakki\\PhpErrorCatcher\\Tests\\CapturingCatcher');
@@ -133,7 +134,7 @@ class GlobalFieldsCorrectionTest extends TestCase
         $this->catcher->error('boom', array('smq_id' => '222'));
 
         $fields = $this->lastFields();
-        $this->assertSame('222', $fields['smq_id']);
+        $this->assertSame(222, $fields['smq_id']);
     }
 
     /**
@@ -153,8 +154,8 @@ class GlobalFieldsCorrectionTest extends TestCase
 
         $this->catcher->error('second');
         $this->assertCount(2, $this->catcher->captured);
-        $this->assertSame('2921172', $this->catcher->captured[0]->fields['smq_id']);
-        $this->assertSame('2921172', $this->catcher->captured[1]->fields['smq_id']);
+        $this->assertSame(2921172, $this->catcher->captured[0]->fields['smq_id']);
+        $this->assertSame(2921172, $this->catcher->captured[1]->fields['smq_id']);
         // 'payload' has no rule, so its structure is left alone.
         $this->assertSame(array('a' => 1), $this->catcher->captured[1]->fields['payload']);
     }
@@ -178,7 +179,7 @@ class GlobalFieldsCorrectionTest extends TestCase
         $this->catcher->error(new \RuntimeException('boom', 7));
 
         $fields = $this->lastFields();
-        $this->assertSame('2921172', $fields['smq_id']);
+        $this->assertSame(2921172, $fields['smq_id']);
         $this->assertSame(7, $fields['exception_code']);
         $this->assertSame('RuntimeException', $fields['exception']);
         // Consumed by log() itself, never leaks into fields.

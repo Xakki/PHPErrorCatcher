@@ -99,10 +99,27 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
             // Legacy key (tamaranga bff/db/database.php:498). 'millisecond' is deliberately
             // NOT a word — 'seconds' is the one canonical unit; this pins the one live key.
             'millisecond' => self::CONTEXT_TYPE_INT,
+            // The one id that is NOT an auto-increment integer: the sibling logger (laralog
+            // LogManager::getOrCreateRequestId()) writes a UUID / X-Request-ID header here,
+            // and both libraries ship into the same OpenSearch field. The int 'id' word below
+            // would leave it on the string FALLBACK, which is stable only until some caller
+            // passes an all-digit value — then the field diverges and documents get dropped.
+            // Pinned, not left to the fallback. Keep in sync with laralog 'reserved'.
+            'request_id' => self::CONTEXT_TYPE_STRING,
         ],
         // LAST segment => type. The type words themselves live in 'suffix' above, which
         // wins over this bucket: 'price_int' is an int, not a float.
         'word' => [
+            // Covers the bare key 'id' and every '*_id' (user_id, order_id, smq_id). In these
+            // projects an identifier is an auto-increment integer out of MariaDB, and the
+            // owner wants range queries and aggregations on it — so int, not string.
+            // TRAPS (both silent, both fixed by pinning the key to string via config 'exact'):
+            //   * leading zeros — '00123' becomes 123;
+            //   * an id past PHP_INT_MAX falls back to string, so THAT key is int for short
+            //     values and string for long ones — the exact divergence this method prevents.
+            // A non-integer id (UUID, hash, hex) must be pinned too, never left to the
+            // fallback — see 'request_id' in 'exact' above.
+            'id' => self::CONTEXT_TYPE_INT,
             'count' => self::CONTEXT_TYPE_INT,
             'cnt' => self::CONTEXT_TYPE_INT,
             'size' => self::CONTEXT_TYPE_INT,
@@ -143,8 +160,10 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
             'flag' => self::CONTEXT_TYPE_BOOL,
             'enabled' => self::CONTEXT_TYPE_BOOL,
             'success' => self::CONTEXT_TYPE_BOOL,
-            // No 'force string' list: string IS the default, so 'id', 'code', 'at', 'uuid',
-            // 'hash', 'ip', 'name', 'key', 'version' need no entry.
+            // No 'force string' list: string IS the default, so 'code', 'at', 'uuid',
+            // 'hash', 'ip', 'name', 'key', 'version' need no entry. NOTE: 'word' outranks
+            // 'prefix', so a bool prefix loses to a typed last segment — 'is_bot_id' is an
+            // INT, not a bool.
         ],
         // FIRST segment => type, only for keys with more than one segment.
         'prefix' => [

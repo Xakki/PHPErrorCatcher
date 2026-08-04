@@ -42,14 +42,27 @@ class ContextTypeCorrectorTest extends TestCase
     public function correctorProvider()
     {
         $cases = array(
-            // --- STRING IS THE DEFAULT: identifiers and codes have no rule any more ---
-            array('id', '42', '42'),
-            array('id', 42, '42'),
-            array('smq_id', '2921172', '2921172'),
-            array('smq_id', 2921172, '2921172'),
-            array('smq_id', 0, '0'),
+            // --- 'id' is an int WORD: the bare key and every '*_id' ---
+            array('id', '42', 42),
+            array('id', 42, 42),
+            array('user_id', '17', 17),
+            array('order_id', '42', 42),
+            array('smq_id', '2921172', 2921172),
+            array('smq_id', 2921172, 2921172),
+            array('smq_id', 0, 0),
             array('smq_id', null, null),
-            array('analysis_id', 5, '5'),
+            array('analysis_id', 5, 5),
+            // Pinned to string in 'exact': the sibling logger writes a UUID here. It must NOT
+            // depend on the string fallback — an all-digit value would flip the field to int.
+            array('request_id', '3f2a1c8e-5b6d-4e7f-9a01-2b3c4d5e6f70', '3f2a1c8e-5b6d-4e7f-9a01-2b3c4d5e6f70'),
+            array('request_id', '2921172', '2921172'),
+            array('request_id', 2921172, '2921172'),
+            // The '_int'/'_float'/'_bool' escape hatch still outranks the 'id' word.
+            array('some_id_bool', '1', true),
+            array('some_id_bool', 'off', false),
+            array('some_id_float', '42', 42.0),
+
+            // --- STRING IS THE DEFAULT: codes and free-form keys have no rule ---
             array('http_code', '404', '404'),
             array('http_code', 404, '404'),
             // 'status' IS a typed word (int, to match the sibling logger), so a word-valued
@@ -63,8 +76,16 @@ class ContextTypeCorrectorTest extends TestCase
             array('created_at', '2026-08-04 10:00:00', '2026-08-04 10:00:00'),
             array('app_version', 5.6, '5.6'),
             array('first_name', 777, '777'),
-            // Lossless where the old int rule was not: leading zeros and 20 digits survive.
-            array('smq_id', '007', '007'),
+
+            // --- NAMED TRAPS of the int 'id' rule; remedy for both = pin the key to string
+            // via config ('exact'). Deliberately NOT auto-detected: exceptions go through
+            // config, not heuristics.
+            // 1. Leading zeros are destroyed.
+            array('smq_id', '00123', 123),
+            array('smq_id', '007', 7),
+            // 2. An id past PHP_INT_MAX cannot be cast and falls back to string — so THAT
+            // key is int for short values and string for long ones: the very divergence
+            // this method exists to prevent.
             array('smq_id', '99999999999999999999', '99999999999999999999'),
 
             // --- int rule: the LAST segment is a typed word ---
@@ -164,7 +185,11 @@ class ContextTypeCorrectorTest extends TestCase
             array('homepage', '5', '5'),
             array('underscore', '5', '5'),
             array('separate', '5', '5'),
+            // These merely END IN THE LETTERS 'id' — the last SEGMENT is 'uuid'/'android'/
+            // 'valid'/'orderid', so the int 'id' word never fires. camelCase 'orderId'
+            // lowercases to one segment too and needs an 'exact' entry to be typed at all.
             array('uuid', '5', '5'),
+            array('orderid', '5', '5'),
             array('android', '5', '5'),
             array('valid', '5', '5'),
 
@@ -501,7 +526,7 @@ class ContextTypeCorrectorTest extends TestCase
         );
         foreach ($docs as $doc) {
             PhpErrorCatcher::contextTypeCorrector($doc);
-            $this->assertInternalType('string', $doc['smq_id']);
+            $this->assertInternalType('integer', $doc['smq_id']);
         }
     }
 
@@ -534,7 +559,7 @@ class ContextTypeCorrectorTest extends TestCase
         }
     }
 
-    public function testEmittedJsonForIdIsAlwaysString()
+    public function testEmittedJsonForIdIsAlwaysInt()
     {
         $docs = array(
             array('smq_id' => 0),
@@ -547,7 +572,29 @@ class ContextTypeCorrectorTest extends TestCase
             $seen[] = Tools::safeJsonEncode($doc);
         }
         $this->assertSame(
-            array('{"smq_id":"0"}', '{"smq_id":"2921172"}', '{"smq_id":"2921172"}'),
+            array('{"smq_id":0}', '{"smq_id":2921172}', '{"smq_id":2921172}'),
+            $seen
+        );
+    }
+
+    /**
+     * request_id is pinned to string, so it must NOT follow the int 'id' word even when the
+     * value happens to be all digits — that is what would make the field diverge.
+     */
+    public function testEmittedJsonForRequestIdIsAlwaysString()
+    {
+        $docs = array(
+            array('request_id' => '3f2a1c8e-5b6d-4e7f-9a01-2b3c4d5e6f70'),
+            array('request_id' => '2921172'),
+            array('request_id' => 2921172),
+        );
+        $seen = array();
+        foreach ($docs as $doc) {
+            PhpErrorCatcher::contextTypeCorrector($doc);
+            $seen[] = Tools::safeJsonEncode($doc);
+        }
+        $this->assertSame(
+            array('{"request_id":"3f2a1c8e-5b6d-4e7f-9a01-2b3c4d5e6f70"}', '{"request_id":"2921172"}', '{"request_id":"2921172"}'),
             $seen
         );
     }
@@ -559,18 +606,24 @@ class ContextTypeCorrectorTest extends TestCase
     public function testPatternPrecedence()
     {
         $context = array(
-            'is_bot_id' => '5',        // 'id' has no rule, so the 'is' first segment wins
+            // 'id' is an int word, and 'word' outranks 'prefix' — so a bool prefix LOSES
+            // here. Counter-intuitive but deliberate: name it 'is_bot' if you want a bool.
+            'is_bot_id' => '5',
             'has_count' => '7',        // last 'count' -> int
             'enable_cache' => 'F',     // 'cache' has no rule, first 'enable' -> bool
+            'is_admin' => 'F',         // 'admin' has no rule, first 'is' -> bool
+            'has_access' => '1',       // 'access' has no rule, first 'has' -> bool
             'has_total' => '3',        // last 'total' -> int
             'is_sum' => '1',           // last 'sum' -> int, not the 'is' bool
             'use_money' => '2',        // last 'money' -> float, not the 'use' bool
         );
         PhpErrorCatcher::contextTypeCorrector($context);
 
-        $this->assertSame(true, $context['is_bot_id']);
+        $this->assertSame(5, $context['is_bot_id']);
         $this->assertSame(7, $context['has_count']);
         $this->assertSame(false, $context['enable_cache']);
+        $this->assertSame(false, $context['is_admin']);
+        $this->assertSame(true, $context['has_access']);
         $this->assertSame(3, $context['has_total']);
         $this->assertSame(1, $context['is_sum']);
         $this->assertSame(2.0, $context['use_money']);
@@ -804,6 +857,41 @@ class ContextTypeCorrectorTest extends TestCase
 
         $this->assertSame('007', $context['legacy_count']);
         $this->assertSame(7, $context['retry_count']);
+    }
+
+    /**
+     * The documented remedy for BOTH named traps of the int 'id' rule, proven executable:
+     * there is no '_string' escape hatch, so a key carrying zero-padded or oversized ids
+     * can only be pinned back to string through config 'exact'.
+     *
+     * Left unpinned (see the provider) '00123' becomes 123 and a 20-digit id falls back to
+     * string, so THAT key would be int for short values and string for long ones.
+     */
+    public function testIdTrapsAreFixedByPinningTheKeyToString()
+    {
+        $backup = PhpErrorCatcher::$contextTypeRules;
+        PhpErrorCatcher::addContextTypeRules(array(
+            'exact' => array('legacy_id' => PhpErrorCatcher::CONTEXT_TYPE_STRING),
+        ));
+
+        $context = array(
+            'legacy_id' => '00123',
+            'legacy_id_long' => '99999999999999999999',
+            'order_id' => '00123',
+        );
+        // The oversized case needs its own pin: 'legacy_id_long' ends in the segment 'long'.
+        PhpErrorCatcher::addContextTypeRules(array(
+            'exact' => array('legacy_id_long' => PhpErrorCatcher::CONTEXT_TYPE_STRING),
+        ));
+        PhpErrorCatcher::contextTypeCorrector($context);
+
+        PhpErrorCatcher::$contextTypeRules = $backup;
+
+        // Pinned: leading zeros survive, and the key is a string for EVERY value length.
+        $this->assertSame('00123', $context['legacy_id']);
+        $this->assertSame('99999999999999999999', $context['legacy_id_long']);
+        // Unpinned: the trap, asserted so it can never regress silently.
+        $this->assertSame(123, $context['order_id']);
     }
 
     /**
