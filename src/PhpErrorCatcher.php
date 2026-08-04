@@ -30,6 +30,142 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         FIELD_NO_TRACE = 'trace_no_fake',
         FIELD_ERR_CODE = 'error_code';
 
+    const CONTEXT_TYPE_INT = 'int',
+        CONTEXT_TYPE_FLOAT = 'float',
+        CONTEXT_TYPE_BOOL = 'bool',
+        CONTEXT_TYPE_STRING = 'string',
+        CONTEXT_TYPE_SKIP = 'skip';
+
+    /**
+     * Lucene refuses to index a term longer than 32766 bytes; cap below that,
+     * leaving headroom for the truncation marker.
+     */
+    const CONTEXT_MAX_STRING_BYTES = 32000;
+
+    /** Depth bound for json_encode of nested context values (guards recursion / huge blobs). */
+    const CONTEXT_JSON_MAX_DEPTH = 16;
+
+    /**
+     * Key => type rules used by contextTypeCorrector() — see that method for the bucket
+     * resolution order. Public and mutable: a host app extends it at runtime, e.g.
+     *   PhpErrorCatcher::$contextTypeRules['word']['rub'] = PhpErrorCatcher::CONTEXT_TYPE_FLOAT;
+     * or declaratively via the 'contextTypeRulesExtra' config key (addContextTypeRules()).
+     * Entries are matched lowercased, so must be supplied lowercase.
+     *
+     * @var array<string, array<string, string>>
+     */
+    public static $contextTypeRules = [
+        // ESCAPE HATCH — TOP of the resolution chain, beats every other bucket including
+        // 'reserved'. LAST segment only. Name a key '*_int'/'*_float'/'*_bool' when you
+        // must force a type: it is the one rule nothing else can override.
+        'suffix' => [
+            'int' => self::CONTEXT_TYPE_INT,
+            'float' => self::CONTEXT_TYPE_FLOAT,
+            'bool' => self::CONTEXT_TYPE_BOOL,
+        ],
+        // Fields this library writes into the context itself — pinned explicitly so a
+        // string default can't regress the library's own metadata.
+        'reserved' => [
+            self::FIELD_LOG_TYPE => self::CONTEXT_TYPE_STRING,
+            self::FIELD_FILE => self::CONTEXT_TYPE_STRING,
+            self::FIELD_TAG => self::CONTEXT_TYPE_STRING,
+            self::FIELD_ERR_CODE => self::CONTEXT_TYPE_INT,
+            // Consumed (and unset) by log() itself: it needs the raw array to render a trace.
+            self::FIELD_TRACE => self::CONTEXT_TYPE_SKIP,
+            self::FIELD_NO_TRACE => self::CONTEXT_TYPE_SKIP,
+            // Written by getLogFromObject(); the codes are already (int)-cast there because
+            // PDOException::getCode() returns a SQLSTATE string.
+            'exception' => self::CONTEXT_TYPE_STRING,
+            'exception_code' => self::CONTEXT_TYPE_INT,
+            'exception_prev' => self::CONTEXT_TYPE_STRING,
+            'exception_prev_message' => self::CONTEXT_TYPE_STRING,
+            'exception_prev_file' => self::CONTEXT_TYPE_STRING,
+            'exception_prev_code' => self::CONTEXT_TYPE_INT,
+            'exception_prev_trace' => self::CONTEXT_TYPE_STRING,
+            'logCookieKey' => self::CONTEXT_TYPE_STRING,
+        ],
+        // Whole-key overrides — the only way to type a camelCase key with no segments
+        // to match (e.g. 'orderid').
+        'exact' => [
+            // Cross-library type agreement: the sibling logger (laralog, Laravel app) writes
+            // these same keys into the same OpenSearch cluster (types per laralog
+            // src/LogManager.php) — a mismatch defeats this whole method. Do not delete.
+            // Last segment 'mctime' is not a word (would collide with the int 'time' rule).
+            'mctime' => self::CONTEXT_TYPE_FLOAT,
+            // memory_get_usage()/memory_get_peak_usage() — both int; last segments
+            // 'usage'/'peak' carry no type and are too generic to become words.
+            'memory_usage' => self::CONTEXT_TYPE_INT,
+            'memory_peak' => self::CONTEXT_TYPE_INT,
+            // Legacy key (tamaranga bff/db/database.php:498). 'millisecond' is deliberately
+            // NOT a word — 'seconds' is the one canonical unit; this pins the one live key.
+            'millisecond' => self::CONTEXT_TYPE_INT,
+        ],
+        // LAST segment => type. The type words themselves live in 'suffix' above, which
+        // wins over this bucket: 'price_int' is an int, not a float.
+        'word' => [
+            'count' => self::CONTEXT_TYPE_INT,
+            'cnt' => self::CONTEXT_TYPE_INT,
+            'size' => self::CONTEXT_TYPE_INT,
+            'len' => self::CONTEXT_TYPE_INT,
+            'length' => self::CONTEXT_TYPE_INT,
+            'num' => self::CONTEXT_TYPE_INT,
+            'qty' => self::CONTEXT_TYPE_INT,
+            'total' => self::CONTEXT_TYPE_INT,
+            // A counted sum, not money — money is 'money'/'amount'/'price' (float).
+            'sum' => self::CONTEXT_TYPE_INT,
+            'bytes' => self::CONTEXT_TYPE_INT,
+            'port' => self::CONTEXT_TYPE_INT,
+            'level' => self::CONTEXT_TYPE_INT,
+            'limit' => self::CONTEXT_TYPE_INT,
+            'offset' => self::CONTEXT_TYPE_INT,
+            'page' => self::CONTEXT_TYPE_INT,
+            'depth' => self::CONTEXT_TYPE_INT,
+            'attempt' => self::CONTEXT_TYPE_INT,
+            'retries' => self::CONTEXT_TYPE_INT,
+            'ttl' => self::CONTEXT_TYPE_INT,
+            // Sole time-unit word left on purpose — ms/millisecond(s)/sec/secs were removed
+            // to force one naming convention; a key using any of those is now a plain string.
+            'seconds' => self::CONTEXT_TYPE_INT,
+            // int to match the sibling logger (LOGGER_TIME / LOGGER_STATUS).
+            // TRAP: '*_time' TRUNCATES a microtime(true) value — name it '*_duration'/'*_seconds'.
+            'time' => self::CONTEXT_TYPE_INT,
+            'status' => self::CONTEXT_TYPE_INT,
+            // The money words. 'total'/'sum' are int — a money value must use one of these.
+            'money' => self::CONTEXT_TYPE_FLOAT,
+            'amount' => self::CONTEXT_TYPE_FLOAT,
+            'price' => self::CONTEXT_TYPE_FLOAT,
+            'duration' => self::CONTEXT_TYPE_FLOAT,
+            'rate' => self::CONTEXT_TYPE_FLOAT,
+            'ratio' => self::CONTEXT_TYPE_FLOAT,
+            'percent' => self::CONTEXT_TYPE_FLOAT,
+            'avg' => self::CONTEXT_TYPE_FLOAT,
+            'score' => self::CONTEXT_TYPE_FLOAT,
+            'flag' => self::CONTEXT_TYPE_BOOL,
+            'enabled' => self::CONTEXT_TYPE_BOOL,
+            'success' => self::CONTEXT_TYPE_BOOL,
+            // No 'force string' list: string IS the default, so 'id', 'code', 'at', 'uuid',
+            // 'hash', 'ip', 'name', 'key', 'version' need no entry.
+        ],
+        // FIRST segment => type, only for keys with more than one segment.
+        'prefix' => [
+            'is' => self::CONTEXT_TYPE_BOOL,
+            'has' => self::CONTEXT_TYPE_BOOL,
+            'can' => self::CONTEXT_TYPE_BOOL,
+            'should' => self::CONTEXT_TYPE_BOOL,
+            'allow' => self::CONTEXT_TYPE_BOOL,
+            'enable' => self::CONTEXT_TYPE_BOOL,
+            'use' => self::CONTEXT_TYPE_BOOL,
+        ],
+    ];
+
+    /**
+     * Lowercased string values meaning boolean false. Legacy data really does ship 'F',
+     * and a blind (bool)'F' is true.
+     *
+     * @var string[]
+     */
+    public static $contextFalseValues = ['', '0', 'f', 'false', 'n', 'no', 'off'];
+
     /** @var string[] */
     protected static $triggerLevel = [
         E_ERROR => self::LEVEL_ERROR,
@@ -134,6 +270,13 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
     protected $lifeTime = 600;//sec // ini_get('max_execution_time')
     /** @var array */
     protected $logFields = [];
+    /**
+     * Host-supplied context type rules, merged into static::$contextTypeRules at init
+     * (config key 'contextTypeRulesExtra' — the static table can't be filled via applyConfig()).
+     *
+     * @var array<string, array<string, string>>
+     */
+    protected $contextTypeRulesExtra = [];
     /************************************/
     // Variable
     /************************************/
@@ -284,6 +427,57 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         foreach ($config as $key => $value) {
             if (property_exists($this, $key) && substr($key, 0, 1) != '_') {
                 $this->$key = $value;
+            }
+        }
+        if ($this->contextTypeRulesExtra) {
+            self::addContextTypeRules($this->contextTypeRulesExtra);
+        }
+    }
+
+    /**
+     * Merge host-declared rules into the type table (entries win over library defaults for
+     * the same pattern). Called from the 'contextTypeRulesExtra' config key at init, or
+     * directly at runtime.
+     *
+     * A 'suffix'/'word'/'prefix' entry is a whole SEGMENT ('ttl', not '_ttl') — stray
+     * underscores are trimmed. Unknown buckets and non-CONTEXT_TYPE_* values are skipped
+     * silently: a config typo must not break logging, and this runs before the logger
+     * is usable.
+     *
+     * @param array<string, array<string, string>> $rules
+     * @return void
+     */
+    public static function addContextTypeRules(array $rules)
+    {
+        $types = [
+            self::CONTEXT_TYPE_INT => 1,
+            self::CONTEXT_TYPE_FLOAT => 1,
+            self::CONTEXT_TYPE_BOOL => 1,
+            self::CONTEXT_TYPE_STRING => 1,
+            self::CONTEXT_TYPE_SKIP => 1,
+        ];
+        foreach ($rules as $bucket => $entries) {
+            if (!isset(self::$contextTypeRules[$bucket]) || !is_array($entries)) {
+                continue;
+            }
+            foreach ($entries as $pattern => $type) {
+                if (!isset($types[$type])) {
+                    continue;
+                }
+                // 'reserved' is looked up by the raw key first, every other bucket only by
+                // the lowercased one — so a host entry must be lowercase to ever match.
+                if ($bucket !== 'reserved') {
+                    $pattern = strtolower($pattern);
+                }
+                if ($bucket === 'word' || $bucket === 'prefix' || $bucket === 'suffix') {
+                    $pattern = trim($pattern, '_');
+                    if ($pattern === '' || strpos($pattern, '_') !== false) {
+                        // A multi-segment 'word' entry can never match one segment; an
+                        // 'exact' entry is what types a whole key.
+                        continue;
+                    }
+                }
+                self::$contextTypeRules[$bucket][$pattern] = $type;
             }
         }
     }
@@ -1429,6 +1623,268 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
     }
 
     /**
+     * Make every context key produce a STABLE json type across all documents.
+     *
+     * Why: OpenSearch indices run with `ignore_malformed` unset, so when the same field
+     * name arrives as int in one document and string in another, it silently rejects the
+     * WHOLE document. Observed in prod: `smq_id` shipped as int 0, string '2921172' and
+     * null from three different call sites.
+     *
+     * STRING is the default for every key; explicit rules exist only for genuinely
+     * arithmetic keys (int/float/bool). Matching is on whole underscore-separated
+     * SEGMENTS, never substrings — 'report' never sees 'port', 'datetime' never sees 'time'.
+     *
+     * Resolution order (first match wins, deterministic):
+     *   1. $contextTypeRules['suffix'] — the ESCAPE HATCH: LAST segment 'int'/'float'/'bool'.
+     *      Highest priority, beats every bucket below including 'reserved' — naming a key
+     *      '*_int' is the one way to force a type that nothing else can override.
+     *   2. $contextTypeRules['reserved'] — whole key; library-owned fields.
+     *      CONTEXT_TYPE_SKIP there means "log() consumes this itself, do not touch".
+     *   3. $contextTypeRules['exact'] — whole key, lowercased. Host override level; also
+     *      the only way to type a camelCase key that has no segments to match.
+     *   4. $contextTypeRules['word'] — the LAST segment.
+     *   5. $contextTypeRules['prefix'] — the FIRST segment, for keys with 2+ segments only.
+     *   6. no rule — a SCALAR becomes a byte-capped string; an ARRAY or OBJECT passes
+     *      through untouched (flattening would break existing queries on nested paths).
+     *
+     * A value is cast only when information-preserving; otherwise it falls back to string
+     * (array/object under a scalar rule is json-encoded instead). `null` always stays null.
+     * Exception: a fractional value under an int rule is truncated rather than falling back
+     * to string, so e.g. `retries => 1.5` and `retries => 3` don't diverge in type.
+     *
+     * KNOWN LIMITATION: a key whose values are genuinely of two kinds re-diverges
+     * (`status => 'ok'` falls back to string, `status => 500` stays int) — pin it via
+     *   PhpErrorCatcher::$contextTypeRules['exact']['status'] = PhpErrorCatcher::CONTEXT_TYPE_STRING;
+     * or drop the word from 'word' to unpin every key ending in it.
+     *
+     * Credential redaction is NOT done here — the consuming app owns its own redactor.
+     *
+     * @param array $context
+     * @return void
+     */
+    public static function contextTypeCorrector(array &$context)
+    {
+        // Merged once per call, not per key: the table is public and a host app may replace it.
+        $rules = array_merge(
+            ['suffix' => [], 'reserved' => [], 'exact' => [], 'word' => [], 'prefix' => []],
+            self::$contextTypeRules
+        );
+        foreach ($context as $k => &$r) {
+            $type = self::contextResolveType((string) $k, $rules);
+            if ($type === self::CONTEXT_TYPE_SKIP) {
+                continue;
+            }
+            $r = self::contextCastValue($r, $type);
+        }
+        // Avoid leaving a live reference to the last element (trap for a future second loop).
+        unset($r);
+    }
+
+    /**
+     * @param string $key
+     * @param array $rules
+     * @return string|null Type constant, or null when no rule matches
+     */
+    protected static function contextResolveType($key, array $rules)
+    {
+        $low = strtolower($key);
+
+        // Whole segments only: 'report' splits into ['report'], never matches 'port'.
+        $parts = explode('_', $low);
+        $last = $parts[count($parts) - 1];
+
+        // 1. Escape hatch, beats everything: an explicit '*_int'/'*_float'/'*_bool' name.
+        if (isset($rules['suffix'][$last])) {
+            return $rules['suffix'][$last];
+        }
+        if (isset($rules['reserved'][$key])) {
+            return $rules['reserved'][$key];
+        }
+        if (isset($rules['reserved'][$low])) {
+            return $rules['reserved'][$low];
+        }
+        if (isset($rules['exact'][$low])) {
+            return $rules['exact'][$low];
+        }
+        if (isset($rules['word'][$last])) {
+            return $rules['word'][$last];
+        }
+        // A single-segment key has no prefix: a lone 'is' is a word, not a flag.
+        if (count($parts) > 1 && isset($rules['prefix'][$parts[0]])) {
+            return $rules['prefix'][$parts[0]];
+        }
+        return null;
+    }
+
+    /**
+     * @param mixed $value
+     * @param string|null $type
+     * @return mixed
+     */
+    protected static function contextCastValue($value, $type)
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_object($value) && $type === self::CONTEXT_TYPE_STRING && method_exists($value, '__toString')) {
+            // A value object rendering itself beats json_encode()'ing it to '{}'.
+            return self::contextCapString((string) $value);
+        }
+        if (is_array($value) || is_object($value)) {
+            if ($type === null) {
+                // No declared rule => do NOT flatten; would break existing nested-path queries.
+                return $value;
+            }
+            // Under a scalar rule (int)[1,2] === 1 would silently lose data — json-encode instead.
+            return self::contextJsonEncode($value);
+        }
+        if (is_resource($value)) {
+            return '(resource:' . get_resource_type($value) . ')';
+        }
+
+        switch ($type) {
+            case self::CONTEXT_TYPE_INT:
+                return self::contextCastInt($value);
+            case self::CONTEXT_TYPE_FLOAT:
+                return self::contextCastFloat($value);
+            case self::CONTEXT_TYPE_BOOL:
+                return self::contextCastBool($value);
+        }
+
+        // Default type for every key without an int/float/bool rule.
+        return self::contextCapString(self::contextScalarToString($value));
+    }
+
+    /**
+     * @param int|float|bool|string $value
+     * @return int|string
+     */
+    protected static function contextCastInt($value)
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+        $limit = (float) PHP_INT_MAX;
+        if (is_float($value)) {
+            if (!is_finite($value) || $value >= $limit || $value <= -$limit) {
+                return self::contextScalarToString($value);
+            }
+            return (int) $value;
+        }
+
+        $str = trim($value);
+        if (!self::contextIsDecimal($str)) {
+            // (int)'RU' === 0 would destroy the value — fall back to the default type.
+            return self::contextCapString($value);
+        }
+        $num = $str + 0;
+        if (is_float($num) && (!is_finite($num) || $num >= $limit || $num <= -$limit)) {
+            // Out of int range: (int) would wrap into garbage.
+            return self::contextCapString($value);
+        }
+        return (int) $num;
+    }
+
+    /**
+     * @param int|float|bool|string $value
+     * @return float|string
+     */
+    protected static function contextCastFloat($value)
+    {
+        if (is_float($value)) {
+            return is_finite($value) ? $value : self::contextScalarToString($value);
+        }
+        if (is_int($value)) {
+            return (float) $value;
+        }
+        if (is_bool($value)) {
+            return $value ? 1.0 : 0.0;
+        }
+        $str = trim($value);
+        if (!self::contextIsDecimal($str)) {
+            return self::contextCapString($value);
+        }
+        $num = (float) $str;
+        return is_finite($num) ? $num : self::contextCapString($value);
+    }
+
+    /**
+     * Strict decimal check — deliberately NOT is_numeric(): on PHP 5.6 is_numeric('0x1A')
+     * is true and '0x1A' + 0 destroys the value into int 26. '1_000' is rejected too.
+     *
+     * @param string $str Already trimmed
+     * @return bool
+     */
+    protected static function contextIsDecimal($str)
+    {
+        return (bool) preg_match('/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/', $str);
+    }
+
+    /**
+     * @param int|float|bool|string $value
+     * @return bool
+     */
+    protected static function contextCastBool($value)
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return $value != 0;
+        }
+        return !in_array(strtolower(trim($value)), self::$contextFalseValues, true);
+    }
+
+    /**
+     * @param int|float|bool|string $value
+     * @return string
+     */
+    protected static function contextScalarToString($value)
+    {
+        if (is_bool($value)) {
+            // (string)false === '' would look like a missing value.
+            return $value ? 'true' : 'false';
+        }
+        return (string) $value;
+    }
+
+    /**
+     * @param string $value
+     * @return string
+     */
+    protected static function contextCapString($value)
+    {
+        if (strlen($value) <= self::CONTEXT_MAX_STRING_BYTES) {
+            return $value;
+        }
+        $cut = self::CONTEXT_MAX_STRING_BYTES - 3;
+        // mb_strcut, not substr(): cuts on a byte budget without splitting a multibyte char.
+        return mb_strcut($value, 0, $cut, 'UTF-8') . '...';
+    }
+
+    /**
+     * @param array|object $value
+     * @return string
+     */
+    protected static function contextJsonEncode($value)
+    {
+        $flags = defined('JSON_PRESERVE_ZERO_FRACTION') ? JSON_PRESERVE_ZERO_FRACTION : 0;
+        $json = json_encode($value, $flags, self::CONTEXT_JSON_MAX_DEPTH);
+        if (!is_string($json)) {
+            // Too deep, recursive, or invalid UTF-8 — keep whatever can be salvaged.
+            $json = json_encode($value, $flags | JSON_PARTIAL_OUTPUT_ON_ERROR, self::CONTEXT_JSON_MAX_DEPTH);
+        }
+        if (!is_string($json)) {
+            // Never return false: it would become the empty string downstream.
+            $json = '{"_encode_error":"' . (is_object($value) ? get_class($value) : 'array') . '"}';
+        }
+        return self::contextCapString($json);
+    }
+
+    /**
      * @inheritDoc
      */
     public function log($level, $message, array $context = [])
@@ -1442,6 +1898,12 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
                 unset($context[$k]);
             }
         }
+        unset($v);
+
+        // Early on purpose: the exception fields merged below (and FIELD_TRACE / FIELD_FILE)
+        // are typed deliberately by log() itself and must not be re-coerced afterwards.
+        self::contextTypeCorrector($context);
+
         if (!isset($context[self::FIELD_LOG_TYPE])) {
             $context[self::FIELD_LOG_TYPE] = self::TYPE_LOGGER;
         }
@@ -1502,12 +1964,18 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
         $logData->levelInt = array_search($level, self::$logLevel);
 
         if (count($this->logFields)) {
-            $context = array_merge($this->logFields, $context);
+            // Correct a COPY, not $this->logFields in place: it's shared by every log() call
+            // in the request, so an in-place cast would permanently rewrite what the app stored.
+            $globals = $this->logFields;
+            self::contextTypeCorrector($globals);
+            $context = array_merge($globals, $context);
         }
 
         if ($this->logCookieKey && !empty($_COOKIE[$this->logCookieKey])) {
             // для поиска только нужных логов
-            $context['logCookieKey'] = $_COOKIE[$this->logCookieKey];
+            // Cast explicitly: a cookie can be an array (?c[]=x), and this runs after
+            // contextTypeCorrector() already passed over $context.
+            $context['logCookieKey'] = self::contextCastValue($_COOKIE[$this->logCookieKey], self::CONTEXT_TYPE_STRING);
         }
 
         if (isset($context[self::FIELD_TRACE])) {
@@ -1560,6 +2028,11 @@ class PhpErrorCatcher implements \Psr\Log\LoggerInterface
      */
     public static function safe_json_encode($value, $options = 0, $depth = 512)
     {
+        // See Tools::safeJsonEncode(): a float 5.0 must not encode as `5`, or the field
+        // maps as long here and as double for 19.99 elsewhere.
+        if (defined('JSON_PRESERVE_ZERO_FRACTION')) {
+            $options |= JSON_PRESERVE_ZERO_FRACTION;
+        }
         $encoded = json_encode($value, $options, $depth);
         switch (json_last_error()) {
             case JSON_ERROR_NONE:

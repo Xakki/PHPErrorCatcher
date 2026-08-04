@@ -54,6 +54,11 @@ class Tools
      */
     public static function safeJsonEncode($value, $options = 0, $depth = 512)
     {
+        // Without this, float 5.0 encodes as `5` => OpenSearch mapping conflict vs 19.99 on
+        // the same field. Guarded: constant exists since PHP 5.6.6, composer allows ^5.6.
+        if (defined('JSON_PRESERVE_ZERO_FRACTION')) {
+            $options |= JSON_PRESERVE_ZERO_FRACTION;
+        }
         $encoded = json_encode($value, $options, $depth);
         switch (json_last_error()) {
             case JSON_ERROR_NONE:

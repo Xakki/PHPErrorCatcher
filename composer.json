@@ -48,7 +48,7 @@
   "scripts": {
     "cs-check": "XDEBUG_MODE=off phpcs -ps",
     "cs-fix": "XDEBUG_MODE=off phpcbf -p",
-    "psalm": "psalm",
+    "psalm": "php vendor/vimeo/psalm/psalm",
     "test": "phpunit"
   }
 }
